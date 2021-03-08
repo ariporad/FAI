@@ -1,6 +1,6 @@
 from itertools import islice
 
-class Solution:
+class State:
 	"""
 	Class representing a (possibly-incomplete) solution to the problem.
 
@@ -10,6 +10,13 @@ class Solution:
 	"""
 
 	def __init__(self, center_nut, nuts_to_place, placed_nuts = []):
+		# Calculate the order of this puzzle
+		self.n = len(center_nut) if center_nut else len(nuts_to_place[0])
+
+		# Fill placed_nuts with a bunch of placeholder Nones to avoid index-out-of-bounds errors
+		while len(placed_nuts) < self.n:
+			placed_nuts.append(None)
+
 		# The center nut and nuts_to_place are specified as in the canonical format (see
 		# `canonicalize_nut`). 
 		self.center_nut = center_nut
@@ -20,6 +27,9 @@ class Solution:
 		# element is the one touching the center nut.
 		self.placed_nuts = placed_nuts
 
+	def __str__(self):
+		return f"<State is_invalid={self.is_invalid()} is_complete={self.is_complete()}\n\tcenter={self.center_nut}\n\tplaced_nuts={self.placed_nuts}\n\tnuts_to_place={self.nuts_to_place}\n>"
+
 	def is_invalid(self):
 		"""
 		Validate that the solution doesn't break any rules. **DOES NOT** ensure that the solution is
@@ -29,7 +39,12 @@ class Solution:
 		Returns a string explaining (one of the reason(s)) why the solution is invalid, or False if
 		the solution is valid.
 		"""
+		if not self.center_nut:
+			return False if all(map(lambda x: x is None, self.placed_nuts)) else "No center nut but some nuts have been placed!"
+
 		for i, nut in enumerate(self.placed_nuts):
+			if nut is None: continue # Don't process nonexistant nuts
+
 			# First, check the center connection
 			if self.center_nut[i] != nut[0]:
 				return f"Center[{i}] = {self.center_nut[i]} != nut[{i}][0] = {nut[0]}"
@@ -40,6 +55,7 @@ class Solution:
 
 			next_nut_i = (i + 1) % len(self.placed_nuts)
 			if not self.placed_nuts[next_nut_i]: continue # If the next nut hasn't been placed
+
 			if self.placed_nuts[next_nut_i][1] != nut[-1]:
 				return f"Edge: nut[{i + 1}][0] = {self.placed_nuts[next_nut_i][0]} != nut[{i}][-1] = {nut[-1]}"
 
@@ -51,32 +67,53 @@ class Solution:
 		no rules have been broken. (ie. you should call both is_valid and is_complete to ensure the
 		puzzle is solved.)
 
-		>>> solution = Solution((1, 2, 3), [], [(1, 2, 3), (2, 3, 1), (3, 1, 2)])
-		>>> solution.is_complete()
+		>>> state = State((1, 2, 3), [], [(1, 2, 3), (2, 3, 1), (3, 1, 2)])
+		>>> state.is_complete()
 		True
-		>>> solution.is_invalid()
+		>>> state.is_invalid()
 		False
 		"""
-		return len(self.nuts_to_place) == 0 and len(self.placed_nuts) == len(self.center_nut)
-
-
-def maplist(fn, items):
-	"""Exactly like map, but returns a list."""
-
-	return list(map(fn, items))
-
-def log(title, value):
-	"""
-	For debugging purposes, print out a value (with a description) then return the value. This
-	allows it to be inserted into expressions:
+		return self.center_nut is not None and \
+			len(self.nuts_to_place) == 0 and \
+			len(self.placed_nuts) == self.n and \
+			all(map(lambda x: x is not None, self.placed_nuts))
 	
-	>>> 5 + log("magic number:", 5)
-	magic number: 5
-	10
-	"""
+	def next_states(self):
+		# Invalid states have no next states
+		if self.is_invalid():
+			return []
 
-	print(title, value)
-	return value
+		# If it's complete, then there are no possible next states
+		if self.is_complete():
+			return []
+
+		# If there's no center nut, then the next states are just using every possible nut as the center
+		if not self.center_nut:
+			yield from map(
+				lambda center: State(center, [nut for nut in self.nuts_to_place if nut != center], []),
+				self.nuts_to_place
+			)
+			return
+
+		# Otherwise, the possible states are putting every nut in every open slot, except where that
+		# would be an invalid state.
+		for i in range(len(self.center_nut)):
+			if self.placed_nuts[i]: continue # Can't put a nut here if there already is one
+
+			for nut in self.nuts_to_place:
+				others_to_place = [n for n in self.nuts_to_place if n != nut]
+				new_placed = self.placed_nuts.copy()
+
+				nut_rotated = rotate(nut, nut.index(self.center_nut[i]))
+				new_placed[i] = nut_rotated
+
+				possible_state = State(self.center_nut, others_to_place, new_placed)
+
+				if possible_state.is_invalid():
+					continue
+
+				yield possible_state
+
 
 def permute(items):
 	"""
@@ -115,6 +152,7 @@ def rotate(items, num):
 	(4, 5, 1, 2, 3)
 	"""
 	return items[num:] + items[:num]
+
 
 def unique(items):
 	"""
@@ -155,6 +193,7 @@ def generate_puzzle(n):
 	"""
 
 	numbers = range(1, n + 1)
+
 	all_nuts = permute(numbers)
 	all_nuts_canonicalized = map(canonicalize_nut, all_nuts)
 	all_nuts_unique = unique(all_nuts_canonicalized)
@@ -163,7 +202,77 @@ def generate_puzzle(n):
 
 	return puzzle
 
+
+class LazyStack:
+	"""
+	A lazy interator based queue.
+
+	>> queue = LazyQueue([1, 2, 3])
+	>> for i in queue:
+	>>   if i == 1: queue.push([4, 5, 6])
+	>>	  print(i)
+	1
+	2
+	3
+	4
+	5
+	6
+	"""
+
+	def __init__(self, iterator):
+		self.iterators = []
+		self.push(iterator)
+
+	def __iter__(self):
+		while True:
+			if len(self.iterators) == 0: return
+
+			try:
+				yield next(self.iterators[-1])
+			except StopIteration:
+				self.iterators.pop()
+				continue
+
+	def push(self, iterator):
+		self.iterators.append(iter(iterator))
+
+
+def solve_puzzle(nuts):
+	state = State(None, nuts, [])
+
+	stack = LazyStack([state])
+
+	for state in stack:
+		is_invalid = state.is_invalid()
+		is_complete = state.is_complete()
+		next_states = state.next_states()
+		
+		if is_invalid: continue
+		if is_complete: # implicitly isn't invalid from above
+			print("Solved it!")
+			return state
+		stack.push(next_states)
+	
+	print("Couldn't find a solution!")
+	return None
+
+
 if __name__ == "__main__":
 	import doctest
 	doctest.testmod()
-	print(list(generate_puzzle(6)))
+
+	TEST_PUZZLE = [
+		(1, 6, 5, 4, 3, 2),
+		(1, 6, 4, 2, 5, 3),
+		(1, 2, 3, 4, 5, 6),
+		(1, 6, 2, 4, 5, 3),
+		(1, 4, 3, 6, 5, 2),
+		(1, 4, 6, 2, 3, 5),
+		(1, 6, 5, 3, 2, 4),
+	]
+
+	puzzle = list(generate_puzzle(6))
+	# puzzle = TEST_PUZZLE
+
+	print("Puzzle:", puzzle)
+	print("Solution:", solve_puzzle(puzzle))
