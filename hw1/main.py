@@ -256,23 +256,59 @@ def solve_puzzle(nuts):
 	print("Couldn't find a solution!")
 	return None
 
+TEST_PUZZLE = [
+	(1, 6, 5, 4, 3, 2),
+	(1, 6, 4, 2, 5, 3),
+	(1, 2, 3, 4, 5, 6),
+	(1, 6, 2, 4, 5, 3),
+	(1, 4, 3, 6, 5, 2),
+	(1, 4, 6, 2, 3, 5),
+	(1, 6, 5, 3, 2, 4),
+]
+
+def format_hexnut(nut):
+	assert(len(nut) == 6)
+	return f"""
+ {nut[5]} {nut[0]} 
+{nut[4]}   {nut[1]}
+ {nut[3]} {nut[2]} 
+	"""
+
+
+def main():
+	print("Ari Porad's Solution for HW1:")
+	state = solve_puzzle(TEST_PUZZLE)
+	print(state)
+
+	nc = state.center_nut
+	n0 = state.placed_nuts[0]
+	n1 = state.placed_nuts[1]
+	n2 = state.placed_nuts[2]
+	n3 = state.placed_nuts[3]
+	n4 = state.placed_nuts[4]
+	n5 = state.placed_nuts[5]
+
+	print(f"""
+    {n5[3]} {n5[4]}     {n0[2]} {n0[3]}     
+   {n5[2]}   {n5[5]}   {n0[1]}   {n0[4]}    
+    {n5[1]} {n5[0]}     {n0[0]} {n0[5]}     
+                          
+ {n4[4]} {n4[5]}     {nc[5]} {nc[0]}     {n1[1]} {n1[2]} 
+{n4[3]}   {n4[0]}   {nc[4]}   {nc[1]}   {n1[0]}   {n1[3]} 
+ {n4[2]} {n4[1]}     {nc[3]} {nc[2]}     {n1[3]} {n1[4]}  
+                      
+    {n3[5]} {n3[0]}      {n2[0]} {n2[1]}     
+   {n3[4]}   {n3[1]}    {n2[5]}   {n2[2]}    
+    {n3[3]} {n3[2]}      {n2[4]} {n2[3]}     
+	""")
 
 if __name__ == "__main__":
 	import doctest
 	doctest.testmod()
 
-	TEST_PUZZLE = [
-		(1, 6, 5, 4, 3, 2),
-		(1, 6, 4, 2, 5, 3),
-		(1, 2, 3, 4, 5, 6),
-		(1, 6, 2, 4, 5, 3),
-		(1, 4, 3, 6, 5, 2),
-		(1, 4, 6, 2, 3, 5),
-		(1, 6, 5, 3, 2, 4),
-	]
-
 	puzzle = list(generate_puzzle(6))
-	# puzzle = TEST_PUZZLE
 
 	print("Puzzle:", puzzle)
 	print("Solution:", solve_puzzle(puzzle))
+
+	main()
