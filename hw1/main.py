@@ -1,4 +1,36 @@
 from itertools import islice
+from helpers import permute, rotate, unique, LazyStack
+
+# POSSIBLE OPTIMIZATION: Possible states only for the next nut spot
+
+def canonicalize_nut(nut):
+	"""
+	Rotate a nut such that 1 is first. The elements in the list are in clockwise order.
+
+	>>> canonicalize_nut((4, 5, 6, 1, 2, 3))
+	(1, 2, 3, 4, 5, 6)
+	"""
+
+	return rotate(nut, nut.index(1))
+
+
+def generate_puzzle(n):
+	"""
+	Generate a nuts-style puzzle of n+1 n-sided regular polygons with a number 1 through n on each
+	side.
+	"""
+
+	numbers = range(1, n + 1)
+
+	all_nuts = permute(numbers)
+	all_nuts_canonicalized = map(canonicalize_nut, all_nuts)
+	all_nuts_unique = unique(all_nuts_canonicalized)
+
+	start = 13
+	puzzle = islice(all_nuts_unique, start, start + n + 1)
+
+	return puzzle
+
 
 class State:
 	"""
@@ -115,129 +147,56 @@ class State:
 				yield possible_state
 
 
-def permute(items):
-	"""
-	Lazily produce all possible permutations of items.
-
-	>>> list(permute([1]))
-	[(1,)]
-	>>> list(permute([1, 2, 3]))
-	[(1, 2, 3), (1, 3, 2), (2, 1, 3), (2, 3, 1), (3, 1, 2), (3, 2, 1)]
-	"""
-
-	for item in items:
-		# For some reason, filter doesn't actually work lazily here. However, the list of items is
-		# never really that big, so it's perfectly fine to force it to be eager, which does work
-		others = list(filter(lambda a: a != item, items))
-
-		# We have to use this variable to track if permute(others) actually returned anything (it
-		# won't iff there's only one item left. If it didn't return anything, then the loop will
-		# never execute, but we do need to yield something so that the current item is carried up.
-		had_rest = False
-		for rest in permute(others):
-			had_rest = True
-			yield (item, *rest)
-
-		if not had_rest:
-			yield (item,)
-
-
-def rotate(items, num):
-	"""
-	Rotate a list or tuple.
-
-	>>> rotate([1, 2, 3, 4, 5], 3)
-	[4, 5, 1, 2, 3]
-	>>> rotate((1, 2, 3, 4, 5), 3)
-	(4, 5, 1, 2, 3)
-	"""
-	return items[num:] + items[:num]
-
-
-def unique(items):
-	"""
-	Deduplicate an iterator, lazily. No guarantees are made about order. Values must be hashable.
-
-	>>> list(unique([1, 2, 3, 3, 1]))
-	[1, 2, 3]
-	>>> list(unique([(1, 2), (2, 3), (2, 3), (1, 2)]))
-	[(1, 2), (2, 3)]
-	"""
-
-	already_seen = set()
-
-	for item in items:
-		if item in already_seen:
-			continue
-		else:
-			already_seen.add(item) 
-			yield item
-
-
-
-def canonicalize_nut(nut):
-	"""
-	Rotate a nut such that 1 is first. The elements in the list are in clockwise order.
-
-	>>> canonicalize_nut((4, 5, 6, 1, 2, 3))
-	(1, 2, 3, 4, 5, 6)
-	"""
-
-	return rotate(nut, nut.index(1))
-
-
-def generate_puzzle(n):
-	"""
-	Generate a nuts-style puzzle of n+1 n-sided regular polygons with a number 1 through n on each
-	side.
-	"""
-
-	numbers = range(1, n + 1)
-
-	all_nuts = permute(numbers)
-	all_nuts_canonicalized = map(canonicalize_nut, all_nuts)
-	all_nuts_unique = unique(all_nuts_canonicalized)
-
-	puzzle = islice(all_nuts_unique, n + 1)
-
-	return puzzle
-
-
-class LazyStack:
-	"""
-	A lazy interator based queue.
-
-	>> queue = LazyQueue([1, 2, 3])
-	>> for i in queue:
-	>>   if i == 1: queue.push([4, 5, 6])
-	>>	  print(i)
-	1
-	2
-	3
-	4
-	5
-	6
-	"""
-
-	def __init__(self, iterator):
-		self.iterators = []
-		self.push(iterator)
-
-	def __iter__(self):
-		while True:
-			if len(self.iterators) == 0: return
-
-			try:
-				yield next(self.iterators[-1])
-			except StopIteration:
-				self.iterators.pop()
-				continue
-
-	def push(self, iterator):
-		self.iterators.append(iter(iterator))
 
 
 def solve_puzzle(nuts):
+	"""
+	Given a list of valid nuts, return a State representing the solution to the puzzle (or None if
+	it's unsolvable).
+
+	>>> TEST_PUZZLE = [ # Actual test puzzle as mandated by the assignment
+	... 	(1, 6, 5, 4, 3, 2),
+	... 	(1, 6, 4, 2, 5, 3),
+	... 	(1, 2, 3, 4, 5, 6),
+	... 	(1, 6, 2, 4, 5, 3),
+	... 	(1, 4, 3, 6, 5, 2),
+	... 	(1, 4, 6, 2, 3, 5),
+	... 	(1, 6, 5, 3, 2, 4),
+	... ]
+	>>> solution = solve_puzzle(TEST_PUZZLE)
+	>>> solution.is_invalid()
+	False
+	>>> solution.is_complete()
+	True
+	>>> print(solution) # doctest: +NORMALIZE_WHITESPACE
+	<State is_invalid=False is_complete=True
+        center=(1, 6, 2, 4, 5, 3)
+        placed_nuts=[(1, 4, 6, 2, 3, 5), (6, 5, 3, 2, 4, 1), (2, 1, 4, 3, 6, 5), (4, 5, 6, 1, 2, 3), (5, 3, 1, 6, 4, 2), (3, 2, 1, 6, 5, 4)]
+        nuts_to_place=[]
+	>
+
+	>>> TEST_PUZZLE_EXTRA = [ # Additional test puzzle, known to be solvable
+	... 	(1, 2, 0, 4, 3, 5),
+	... 	(5, 2, 3, 1, 0, 4),
+	... 	(5, 2, 0, 3, 4, 1),
+	... 	(4, 2, 5, 0, 3, 1),
+	... 	(4, 2, 0, 3, 1, 5),
+	... 	(3, 2, 5, 1, 4, 0),
+	... 	(4, 2, 1, 0, 3, 5)
+	... ]
+	>>> solution = solve_puzzle(TEST_PUZZLE)
+	>>> solution.is_invalid()
+	False
+	>>> solution.is_complete()
+	True
+	>>> print(solution) # doctest: +NORMALIZE_WHITESPACE
+	<State is_invalid=False is_complete=True
+        center=(1, 6, 2, 4, 5, 3)
+        placed_nuts=[(1, 4, 6, 2, 3, 5), (6, 5, 3, 2, 4, 1), (2, 1, 4, 3, 6, 5), (4, 5, 6, 1, 2, 3), (5, 3, 1, 6, 4, 2), (3, 2, 1, 6, 5, 4)]
+        nuts_to_place=[]
+	>
+	"""
+
 	state = State(None, nuts, [])
 
 	stack = LazyStack([state])
@@ -249,12 +208,11 @@ def solve_puzzle(nuts):
 		
 		if is_invalid: continue
 		if is_complete: # implicitly isn't invalid from above
-			print("Solved it!")
 			return state
 		stack.push(next_states)
 	
-	print("Couldn't find a solution!")
 	return None
+
 
 TEST_PUZZLE = [
 	(1, 6, 5, 4, 3, 2),
@@ -266,20 +224,14 @@ TEST_PUZZLE = [
 	(1, 6, 5, 3, 2, 4),
 ]
 
-def format_hexnut(nut):
-	assert(len(nut) == 6)
-	return f"""
- {nut[5]} {nut[0]} 
-{nut[4]}   {nut[1]}
- {nut[3]} {nut[2]} 
-	"""
-
 
 def main():
-	print("Ari Porad's Solution for HW1:")
+	print("Ari Porad's Solution for Homework 1, Drive Ya Nuts:")
 	state = solve_puzzle(TEST_PUZZLE)
-	print(state)
+	print(f"Solution Found: {state}" if state else "Couldn't find a solution!")
 
+	# What follows isn't the cleanest way I've ever seen to print out a n = 6 puzzle, but it's
+	# simple and it works.
 	nc = state.center_nut
 	n0 = state.placed_nuts[0]
 	n1 = state.placed_nuts[1]
@@ -295,12 +247,13 @@ def main():
                           
  {n4[4]} {n4[5]}     {nc[5]} {nc[0]}     {n1[1]} {n1[2]} 
 {n4[3]}   {n4[0]}   {nc[4]}   {nc[1]}   {n1[0]}   {n1[3]} 
- {n4[2]} {n4[1]}     {nc[3]} {nc[2]}     {n1[3]} {n1[4]}  
+ {n4[2]} {n4[1]}     {nc[3]} {nc[2]}     {n1[5]} {n1[4]}  
                       
     {n3[5]} {n3[0]}      {n2[0]} {n2[1]}     
    {n3[4]}   {n3[1]}    {n2[5]}   {n2[2]}    
     {n3[3]} {n3[2]}      {n2[4]} {n2[3]}     
 	""")
+
 
 if __name__ == "__main__":
 	import doctest
@@ -308,7 +261,9 @@ if __name__ == "__main__":
 
 	puzzle = list(generate_puzzle(6))
 
-	print("Puzzle:", puzzle)
-	print("Solution:", solve_puzzle(puzzle))
+	print("Randomly Generated Puzzle:", puzzle)
+	print("Solving...")
+	solution = solve_puzzle(puzzle)
+	print(f"Found a Solution: {solution}" if solution else "Couldn't find a solution! Puzzle is unsolvable!")
 
 	main()
