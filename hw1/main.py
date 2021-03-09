@@ -109,12 +109,23 @@ class State:
 			# Then, check the nut's neighbor. We only check one neighbor per nut (the one with the
 			# next index/clockwise), because if all the nuts are in place this will result in all
 			# the connections being checked exactly once.
-
 			next_nut_i = (i + 1) % len(self.placed_nuts)
-			if not self.placed_nuts[next_nut_i]: continue # If the next nut hasn't been placed
-
-			if self.placed_nuts[next_nut_i][1] != nut[-1]:
-				return f"Edge: nut[{i + 1}][0] = {self.placed_nuts[next_nut_i][0]} != nut[{i}][-1] = {nut[-1]}"
+			if self.placed_nuts[next_nut_i]: 
+				# If the next nut exists, then we want to make sure it's valid/the edges match
+				if self.placed_nuts[next_nut_i][1] != nut[-1]:
+					return f"Edge: nut[{i + 1}][0] = {self.placed_nuts[next_nut_i][0]} != nut[{i}][-1] = {nut[-1]}"
+			else:
+				# If the next nut doesn't exist, then we want to make sure it's physically possible
+				# for a nut to fit here. In practice, this means making sure that the number on the
+				# center nut in the next position isn't the same as the number on this nut's edge
+				# pointing towards the next nut (because the next nut can't possibly have the same
+				# number twice).
+				if self.center_nut[next_nut_i] == nut[-1]:
+					return f"Edge/Center Conflict: nut[{i}][-1] = {nut[-1]} == center_nut[{next_nut_i}] = {self.center_nut[next_nut_i]}"
+				# This situation is legal going backwards too, so we also need to check for that
+				prev_nut_i = i - 1 # This is fine because Python supports negative indexes
+				if self.center_nut[prev_nut_i] == nut[1]:
+					return f"Edge/Center Conflict: nut[{i}][1] = {nut[1]} == center_nut[{prev_nut_i}] = {self.center_nut[prev_nut_i]}"
 
 		return False
 
@@ -135,9 +146,9 @@ class State:
 			len(self.placed_nuts) == self.n and \
 			all(map(lambda x: x is not None, self.placed_nuts))
 	
-	def next_states(self):
+	def next_states(self, prune=True):
 		# Invalid states have no next states
-		if self.is_invalid():
+		if prune and self.is_invalid():
 			return []
 
 		# If it's complete, then there are no possible next states
@@ -166,7 +177,7 @@ class State:
 
 				possible_state = State(self.center_nut, others_to_place, new_placed)
 
-				if possible_state.is_invalid():
+				if prune and possible_state.is_invalid():
 					continue
 
 				yield possible_state
@@ -177,7 +188,7 @@ class State:
 			break
 
 
-def solve_puzzle(nuts, all=False):
+def solve_puzzle(nuts, all=False, prune=True):
 	"""
 	Given a list of valid nuts, return a State representing the solution to the puzzle (or None if
 	it's unsolvable).
@@ -226,10 +237,10 @@ def solve_puzzle(nuts, all=False):
 	for state in stack:
 		is_invalid = state.is_invalid()
 		is_complete = state.is_complete()
-		next_states = state.next_states()
+		next_states = state.next_states(prune=prune)
 		
-		if is_invalid: continue
-		if is_complete: # implicitly isn't invalid from above
+		if prune and is_invalid: continue
+		if is_complete and not is_invalid:
 			# We've found a solution!
 			if all:
 				solutions.append(state)
@@ -254,7 +265,7 @@ TEST_PUZZLE = [
 ]
 
 
-def test_solvability(n, count_solutions=True, rounds=1000):
+def test_solvability(n, count_solutions=True, rounds=1000, prune=True):
 	"""
 	Generate `rounds` random puzzles of degree `n`, and check how many of them have solutions.
 	
@@ -272,7 +283,7 @@ def test_solvability(n, count_solutions=True, rounds=1000):
 
 	for i in range(rounds):
 		puzzle = list(generate_puzzle(n))
-		solution = solve_puzzle(puzzle, all=count_solutions)
+		solution = solve_puzzle(puzzle, all=count_solutions, prune=prune)
 
 		if solution:
 			solvable = solvable + 1
@@ -285,12 +296,12 @@ def test_solvability(n, count_solutions=True, rounds=1000):
 
 
 		time_estimate = ((perf_counter() - start_time) / (i + 1)) * (rounds - (i + 1))
-		progress.update((i + 1)/rounds, f"{(i + 1):0004}/{rounds} ({round(time_estimate)}s left): {'Solvable' if solution else 'Unsolvable'}")
+		progress.update((i + 1)/rounds, f"{(i + 1):0004}/{rounds} ({round(time_estimate, 1)}s left): {'Solvable' if solution else 'Unsolvable'}")
 
-	progress.stop(f"Done. {round(100 * solvable/rounds)}% Solvable ({solvable}/{rounds}) for n = {n}")
+	progress.stop(f"Done in {round(perf_counter() - start_time, 1)}s. {round(100 * solvable/rounds, 1)}% Solvable ({solvable}/{rounds}) for n = {n}")
 
 	if count_solutions:
-		print(f"{num_solutions[0]} with 0 solutions, {num_solutions[1]} with 1 solution, {num_solutions[2]} with 2+ solutions (max: {max([num for num, _, _ in very_solvable])}).")
+		print(f"{num_solutions[0]} with 0 solutions, {num_solutions[1]} with 1 solution, {num_solutions[2]} with 2+ solutions (max: {max([num for num, _, _ in very_solvable]) if very_solvable else '-'}).")
 
 	return solvable/rounds
 
@@ -329,7 +340,11 @@ if __name__ == "__main__":
 	import doctest
 	doctest.testmod()
 
-	test_solvability(6)
+	print("With Pruning:")
+	test_solvability(6, prune=True)
+
+	print("Without Pruning:")
+	test_solvability(6, prune=False)
 
 	# puzzle = list(generate_puzzle(5))
 
