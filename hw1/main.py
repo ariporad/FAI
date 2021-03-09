@@ -1,4 +1,4 @@
-from itertools import islice
+from random import shuffle
 from helpers import permute, rotate, unique, LazyStack
 
 # POSSIBLE OPTIMIZATION: Possible states only for the next nut spot
@@ -23,13 +23,13 @@ def generate_puzzle(n):
 	numbers = range(1, n + 1)
 
 	all_nuts = permute(numbers)
-	all_nuts_canonicalized = map(canonicalize_nut, all_nuts)
-	all_nuts_unique = unique(all_nuts_canonicalized)
+	all_nuts = map(canonicalize_nut, all_nuts)
+	all_nuts = unique(all_nuts)
+	all_nuts = list(all_nuts)
 
-	start = 13
-	puzzle = islice(all_nuts_unique, start, start + n + 1)
+	shuffle(all_nuts)
 
-	return puzzle
+	return all_nuts[0:n + 1]
 
 
 class State:
