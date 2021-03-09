@@ -59,7 +59,33 @@ class State:
 		self.placed_nuts = placed_nuts
 
 	def __str__(self):
-		return f"<State is_invalid={self.is_invalid()} is_complete={self.is_complete()}\n\tcenter={self.center_nut}\n\tplaced_nuts={self.placed_nuts}\n\tnuts_to_place={self.nuts_to_place}\n>"
+		validity = "INV" if self.is_invalid() else "VALD"
+		completeness = "COMP" if self.is_complete() else "PART"
+		flags = "SOLUTION" if self.is_complete() and not self.is_invalid() else validity + "/" + completeness
+
+		def _format_nut(nut):
+			if nut is None:
+				return "-"
+			return "/".join(map(str, nut))
+
+		def _format_nuts(nuts):
+			return ", ".join(map(_format_nut, nuts)) or "-"
+
+		center = _format_nut(self.center_nut)
+		to_place = _format_nuts(self.nuts_to_place)
+		placed = _format_nuts(self.placed_nuts)
+	
+		return f"State: {flags}; C: {center}; Placed: {placed}; Remaining: {to_place}"
+	
+	def format_history(self):
+		output = str(self)
+		current = self.parent
+
+		while current is not None:
+			output = str(current) + "\n  " + "\n  ".join(output.split('\n')) 
+			current = current.parent
+
+		return output
 
 	def is_invalid(self):
 		"""
@@ -170,12 +196,8 @@ def solve_puzzle(nuts, all=False):
 	False
 	>>> solution.is_complete()
 	True
-	>>> print(solution) # doctest: +NORMALIZE_WHITESPACE
-	<State is_invalid=False is_complete=True
-        center=(1, 6, 2, 4, 5, 3)
-        placed_nuts=[(1, 4, 6, 2, 3, 5), (6, 5, 3, 2, 4, 1), (2, 1, 4, 3, 6, 5), (4, 5, 6, 1, 2, 3), (5, 3, 1, 6, 4, 2), (3, 2, 1, 6, 5, 4)]
-        nuts_to_place=[]
-	>
+	>>> print(solution)
+	State: SOLUTION; C: 1/6/2/4/5/3; Placed: 1/4/6/2/3/5, 6/5/3/2/4/1, 2/1/4/3/6/5, 4/5/6/1/2/3, 5/3/1/6/4/2, 3/2/1/6/5/4; Remaining: -
 
 	>>> TEST_PUZZLE_EXTRA = [ # Additional test puzzle, known to be solvable
 	... 	(1, 2, 0, 4, 3, 5),
@@ -191,12 +213,8 @@ def solve_puzzle(nuts, all=False):
 	False
 	>>> solution.is_complete()
 	True
-	>>> print(solution) # doctest: +NORMALIZE_WHITESPACE
-	<State is_invalid=False is_complete=True
-        center=(1, 6, 2, 4, 5, 3)
-        placed_nuts=[(1, 4, 6, 2, 3, 5), (6, 5, 3, 2, 4, 1), (2, 1, 4, 3, 6, 5), (4, 5, 6, 1, 2, 3), (5, 3, 1, 6, 4, 2), (3, 2, 1, 6, 5, 4)]
-        nuts_to_place=[]
-	>
+	>>> print(solution)
+	State: SOLUTION; C: 1/6/2/4/5/3; Placed: 1/4/6/2/3/5, 6/5/3/2/4/1, 2/1/4/3/6/5, 4/5/6/1/2/3, 5/3/1/6/4/2, 3/2/1/6/5/4; Remaining: -
 	"""
 
 	state = State(None, nuts, [])
@@ -311,8 +329,7 @@ if __name__ == "__main__":
 	import doctest
 	doctest.testmod()
 
-	test_solvability(7)
-
+	test_solvability(6)
 
 	# puzzle = list(generate_puzzle(5))
 
