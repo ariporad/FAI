@@ -1,5 +1,5 @@
 from random import shuffle
-from helpers import permute, rotate, unique, LazyStack
+from helpers import permute, rotate, unique, LazyStack, ProgressBar
 
 # POSSIBLE OPTIMIZATION: Possible states only for the next nut spot
 
@@ -225,6 +225,33 @@ TEST_PUZZLE = [
 ]
 
 
+def test_solvability(n, rounds=1000):
+	"""
+	Generate `rounds` random puzzles of degree `n`, and check how many of them have solutions.
+	
+	Prints status to the console, and returns the ratio that were solvable.
+	"""
+
+	print(f"Testing solvability of n = {n} by generating {rounds} random puzzles, and seeing how many are solvable.")
+
+	progress = ProgressBar()
+
+	solvable = 0
+
+	for i in range(rounds):
+		puzzle = list(generate_puzzle(n))
+		solution = solve_puzzle(puzzle)
+
+		if solution:
+			solvable = solvable + 1
+
+		progress.update(i/rounds, f"{i:0004}/{rounds}: " + ("Solvable" if solution else "Unsolvable"))
+
+	progress.stop(f"Done. {round(100 * solvable/rounds)}% Solvable ({solvable}/{rounds}) for n = {n}")
+
+	return solvable/rounds
+
+
 def main():
 	print("Ari Porad's Solution for Homework 1, Drive Ya Nuts:")
 	state = solve_puzzle(TEST_PUZZLE)
@@ -259,11 +286,13 @@ if __name__ == "__main__":
 	import doctest
 	doctest.testmod()
 
-	puzzle = list(generate_puzzle(6))
+	test_solvability(5)
 
-	print("Randomly Generated Puzzle:", puzzle)
-	print("Solving...")
-	solution = solve_puzzle(puzzle)
-	print(f"Found a Solution: {solution}" if solution else "Couldn't find a solution! Puzzle is unsolvable!")
+	# puzzle = list(generate_puzzle(5))
 
-	main()
+	# print("Randomly Generated Puzzle:", puzzle)
+	# print("Solving...")
+	# solution = solve_puzzle(puzzle)
+	# print(f"Found a Solution: {solution}" if solution else "Couldn't find a solution! Puzzle is unsolvable!")
+
+	# main()

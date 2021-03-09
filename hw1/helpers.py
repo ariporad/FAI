@@ -90,3 +90,41 @@ class LazyStack:
 	def push(self, iterator):
 		self.iterators.append(iter(iterator))
 
+# CITATION: This class is heavily adapted from https://stackoverflow.com/a/3160819. Since a progress
+# bar was completely unrelated to the point of this assignment, I felt it was acceptable and
+# appropriate to not write the functionality muself.
+class ProgressBar:
+	"""
+	A command-line progress bar
+	"""
+
+	def __init__(self, width = 40, progress = 0):
+		"""
+		Create a progress bar. This writes it to the console.
+		"""
+
+		self.width = 40
+		self.progress = progress
+		self.last_status = ""
+		self.update(progress, skip_erase=True)
+	
+	def update(self, progress, status = "", skip_erase=False):
+		"""
+		Update the progress bar, rewriting it to the console.
+		"""
+
+		self.progress = progress
+
+		print(f"\r[{'█' * round(self.width * self.progress)}{' ' * round(self.width * (1 - self.progress))}] {status}{' ' * (max(0, len(self.last_status) - len(status)))}", end="", flush=True)
+
+		self.last_status = status
+
+	def stop(self, status = ""):
+		"""
+		Erase the progress bar from the console.
+		"""
+		print(f"\r{' ' * (self.width + 3 + len(self.last_status))}\r{status}", end=("\n" if status else ""), flush=True)
+		self.last_status = status
+
+
+
