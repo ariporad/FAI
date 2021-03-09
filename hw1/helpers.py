@@ -2,6 +2,10 @@ def permute(items):
 	"""
 	Lazily produce all possible permutations of items.
 
+	NOTE: The list of items itself is not processed lazily (that wouldn't really make any sense),
+	but the list of permutations is generated lazily. (So it's safe to call this function with quite
+	large values for `item`)
+
 	>>> list(permute([1]))
 	[(1,)]
 	>>> list(permute([1, 2, 3]))
@@ -11,7 +15,7 @@ def permute(items):
 	for item in items:
 		# For some reason, filter doesn't actually work lazily here. However, the list of items is
 		# never really that big, so it's perfectly fine to force it to be eager, which does work
-		others = list(filter(lambda a: a != item, items))
+		others = [a for a in items if a != item]
 
 		# We have to use this variable to track if permute(others) actually returned anything (it
 		# won't iff there's only one item left. If it didn't return anything, then the loop will
@@ -39,7 +43,8 @@ def rotate(items, num):
 
 def unique(items):
 	"""
-	Deduplicate an iterator, lazily. No guarantees are made about order. Values must be hashable.
+	Deduplicate an iterator, lazily. Items will be emitted in the order of `items`, except that
+	duplicate values will be skipped. Values must be hashable.
 
 	>>> list(unique([1, 2, 3, 3, 1]))
 	[1, 2, 3]
@@ -59,18 +64,21 @@ def unique(items):
 
 class LazyStack:
 	"""
-	A lazy interator-based queue.
+	A lazy interator-based stack.
 
-	>> queue = LazyQueue([1, 2, 3])
-	>> for i in queue:
-	>>   if i == 1: queue.push([4, 5, 6])
+	NOTE: Due to the nature of python iterators, this stack yields each iterator's items in order.
+	However, the iterators themselves go in stackwise order
+
+	>> stack = LazyStack([1, 2, 3])
+	>> for i in stack:
+	>>   if i == 1: stack.push([4, 5, 6])
 	>>	  print(i)
 	1
-	2
-	3
 	4
 	5
 	6
+	2
+	3
 	"""
 
 	def __init__(self, iterator):
@@ -95,10 +103,10 @@ class LazyStack:
 # appropriate to not write the functionality muself.
 class ProgressBar:
 	"""
-	A command-line progress bar
+	A command-line progress bar.
 	"""
 
-	def __init__(self, width = 40, progress = 0):
+	def __init__(self, width = 50, progress = 0):
 		"""
 		Create a progress bar. This writes it to the console.
 		"""
