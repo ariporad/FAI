@@ -1,8 +1,6 @@
 from random import shuffle
 from helpers import permute, rotate, unique, LazyStack, ProgressBar
 
-# POSSIBLE OPTIMIZATION: Possible states only for the next nut spot
-
 def canonicalize_nut(nut):
 	"""
 	Rotate a nut such that 1 is first. The elements in the list are in clockwise order.
@@ -146,7 +144,10 @@ class State:
 
 				yield possible_state
 
-
+			# We only want to generate states for the next open nut slot, because we have to put
+			# something there eventually and so there's no point in generating states for all the
+			# other slots yet.
+			break
 
 
 def solve_puzzle(nuts):
