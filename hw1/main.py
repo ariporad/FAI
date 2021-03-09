@@ -1,4 +1,5 @@
 from random import shuffle
+from time import perf_counter
 from helpers import permute, rotate, unique, LazyStack, ProgressBar
 
 def canonicalize_nut(nut):
@@ -150,7 +151,7 @@ class State:
 			break
 
 
-def solve_puzzle(nuts):
+def solve_puzzle(nuts, all=False):
 	"""
 	Given a list of valid nuts, return a State representing the solution to the puzzle (or None if
 	it's unsolvable).
@@ -202,6 +203,8 @@ def solve_puzzle(nuts):
 
 	stack = LazyStack([state])
 
+	solutions = []
+
 	for state in stack:
 		is_invalid = state.is_invalid()
 		is_complete = state.is_complete()
@@ -209,10 +212,17 @@ def solve_puzzle(nuts):
 		
 		if is_invalid: continue
 		if is_complete: # implicitly isn't invalid from above
-			return state
+			# We've found a solution!
+			if all:
+				solutions.append(state)
+			else:
+				return state
 		stack.push(next_states)
 	
-	return None
+	if all: # we've explored everything
+		return solutions
+	else: # if we're not looking for every solution, then getting here means we didn't find one
+		return None
 
 
 TEST_PUZZLE = [
@@ -226,29 +236,43 @@ TEST_PUZZLE = [
 ]
 
 
-def test_solvability(n, rounds=1000):
+def test_solvability(n, count_solutions=True, rounds=1000):
 	"""
 	Generate `rounds` random puzzles of degree `n`, and check how many of them have solutions.
 	
 	Prints status to the console, and returns the ratio that were solvable.
 	"""
 
-	print(f"Testing solvability of n = {n} by generating {rounds} random puzzles, and seeing how many are solvable.")
+	print(f"Testing solvability of n = {n} by generating {rounds} random puzzles and seeing how many are solvable.")
 
 	progress = ProgressBar()
 
 	solvable = 0
+	num_solutions = [0, 0, 0] # zero solutions, one solution, more than one solution
+	very_solvable = [] # tuples: (solution_count, state, solutions)
+	start_time = perf_counter()
 
 	for i in range(rounds):
 		puzzle = list(generate_puzzle(n))
-		solution = solve_puzzle(puzzle)
+		solution = solve_puzzle(puzzle, all=count_solutions)
 
 		if solution:
 			solvable = solvable + 1
+		
+		if count_solutions:
+			solution_count = min(2, len(solution))
+			num_solutions[solution_count] = num_solutions[solution_count] + 1
+			if solution_count == 2:
+				very_solvable.append((solution_count, puzzle, solution))
 
-		progress.update(i/rounds, f"{i:0004}/{rounds}: " + ("Solvable" if solution else "Unsolvable"))
+
+		time_estimate = ((perf_counter() - start_time) / (i + 1)) * (rounds - (i + 1))
+		progress.update((i + 1)/rounds, f"{(i + 1):0004}/{rounds} ({round(time_estimate)}s left): {'Solvable' if solution else 'Unsolvable'}")
 
 	progress.stop(f"Done. {round(100 * solvable/rounds)}% Solvable ({solvable}/{rounds}) for n = {n}")
+
+	if count_solutions:
+		print(f"{num_solutions[0]} with 0 solutions, {num_solutions[1]} with 1 solution, {num_solutions[2]} with 2+ solutions (max: {max([num for num, _, _ in very_solvable])}).")
 
 	return solvable/rounds
 
@@ -287,7 +311,8 @@ if __name__ == "__main__":
 	import doctest
 	doctest.testmod()
 
-	test_solvability(5)
+	test_solvability(7)
+
 
 	# puzzle = list(generate_puzzle(5))
 
