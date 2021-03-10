@@ -3,6 +3,61 @@ This file contains a number of helper utilities that are neither particularly in
 needed. None contain any domain knowledge.
 """
 
+from math import factorial
+from random import shuffle
+
+def tuple_shuffled(items):
+	"""
+	Like random.shuffle, but works on a tuple. Due to the immutable nature of a tuple, this returns
+	a new, shuffled tuple and leaves the original untouched, unlike random.shuffle.
+	"""
+
+	items = list(items)
+	shuffle(items)
+	return tuple(items)
+
+
+def permute_fast(items, unique=True):
+	"""
+	Lazily produce all possible permutations of items. Returns the permutations in a random order,
+	and does so very quickly (without generating all possible permutations first).
+
+	NOTE: The list of items itself is not processed lazily (that wouldn't really make any sense),
+	but the list of permutations is generated lazily. (So it's safe to call this function with quite
+	large values for `item`)
+
+	NOTE: This method works by continually re-shuffling `items` (if unique=True, then it checks for
+	and avoids duplicates). This means that it is non deterministic in the order it yields
+	permutations. If called to completion, it should always return every permutation exactly once
+	then stop (if unique=True) or keep returning random permutations forever. As a result of this,
+	it returns the permutations in a random order and without needing to generate a significant
+	number of permutations ahead of time, which is a very significant improvement for large lists of
+	items.
+
+	>>> list(permute([1]))
+	[(1,)]
+	>>> list(permute([1, 2, 3]))
+	[(1, 2, 3), (1, 3, 2), (2, 1, 3), (2, 3, 1), (3, 1, 2), (3, 2, 1)]
+	"""
+
+	already_generated = set()
+	# used to prevent an infinite loop if unique is true and we've found every possible combonation
+	max_items = factorial(len(items))
+
+	while True:
+		permutation = tuple_shuffled(items)
+
+		if unique:
+			if permutation in already_generated:
+				continue
+			already_generated.add(permutation)
+
+		yield permutation
+
+		if unique and len(already_generated) >= max_items:
+			return
+
+
 def permute(items):
 	"""
 	Lazily produce all possible permutations of items.
@@ -10,6 +65,13 @@ def permute(items):
 	NOTE: The list of items itself is not processed lazily (that wouldn't really make any sense),
 	but the list of permutations is generated lazily. (So it's safe to call this function with quite
 	large values for `item`)
+
+	This method systematically iterates through items, so a) it runs in deterministic time, and
+	b) the output order won't look very "random" (ie. you'd get [(1, 2, 3), (1, 3, 2), ...]). If
+	those attributes are undesirable, look at permute_fast.
+
+	For the purposes of this assignment, this version is faster for smaller lists of items, but much
+	slower for larger lists.
 
 	>>> list(permute([1]))
 	[(1,)]
@@ -43,6 +105,7 @@ def rotate(items, num):
 	>>> rotate((1, 2, 3, 4, 5), 3)
 	(4, 5, 1, 2, 3)
 	"""
+
 	return items[num:] + items[:num]
 
 

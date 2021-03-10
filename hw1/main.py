@@ -1,6 +1,8 @@
 from random import shuffle
 from time import perf_counter
-from helpers import permute, rotate, unique, LazyStack, ProgressBar
+from itertools import islice
+from helpers import permute, rotate, unique, LazyStack, ProgressBar, permute_fast
+
 
 def canonicalize_nut(nut):
 	"""
@@ -10,25 +12,27 @@ def canonicalize_nut(nut):
 	(1, 2, 3, 4, 5, 6)
 	"""
 
-	return rotate(nut, nut.index(1))
+	return tuple(rotate(nut, nut.index(1)))
 
 
-def generate_puzzle(n):
+def generate_puzzle(n, fast=True):
 	"""
 	Generate a nuts-style puzzle of n+1 n-sided regular polygons with a number 1 through n on each
 	side.
 	"""
 
-	numbers = range(1, n + 1)
+	# As a slight performance optimization, we don't actually permute all the numbers from 1 to n.
+	# Because we need to return the nuts in canonicalized form, the 1 always needs to come first.
+	# Rather than permutating the 1 too, then needing to canonicalize and unique the generated nuts,
+	# we permute the numbers from 2 to n, and just add a 1 to the front at the end. Effectively,
+	# this eliminates the possibility of generating two nuts that are the same when rotated, thereby
+	# eliminating the need to canonicalize and unique the produced nuts.
+	numbers = range(2, n + 1)
 
-	all_nuts = permute(numbers)
-	all_nuts = map(canonicalize_nut, all_nuts)
-	all_nuts = unique(all_nuts)
-	all_nuts = list(all_nuts)
-
-	shuffle(all_nuts)
-
-	return all_nuts[0:n + 1]
+	nuts = permute_fast(numbers)
+	nuts = map(lambda nut: (1, ) + nut, nuts)
+	
+	return list(islice(nuts, n + 1))
 
 
 class State:
@@ -61,6 +65,10 @@ class State:
 		self.parent = parent
 
 	def __str__(self):
+		"""
+		Format this state in a nice human-readable way.
+		"""
+
 		validity = "INV" if self.is_invalid() else "VALD"
 		completeness = "COMP" if self.is_complete() else "PART"
 		flags = "SOLUTION" if self.is_complete() and not self.is_invalid() else validity + "/" + completeness
@@ -80,6 +88,10 @@ class State:
 		return f"State: {flags}; C: {center}; Placed: {placed}; Remaining: {to_place}"
 	
 	def format_history(self):
+		"""
+		Print out this state and its entire history, in a nice human-readable way.
+		"""
+
 		output = str(self)
 		current = self.parent
 
@@ -98,6 +110,7 @@ class State:
 		Returns a string explaining (one of the reason(s)) why the solution is invalid, or False if
 		the solution is valid.
 		"""
+
 		if not self.center_nut:
 			return False if all(map(lambda x: x is None, self.placed_nuts)) else "No center nut but some nuts have been placed!"
 
@@ -195,6 +208,13 @@ def solve_puzzle(nuts, all=False, prune=True):
 	Given a list of valid nuts, return a State representing the solution to the puzzle (or None if
 	it's unsolvable).
 
+	If `all=True`, then this method will find all possible solutions to the puzzle and return a list
+	of them.
+
+	If `prune=False`, then this method won't eliminate and ignore solutions that break a rule, and
+	will instead fully traverse the tree of _all_ possible states. There's no reason to ever do
+	this, it's simply here for the purposes of the assignment.
+
 	>>> TEST_PUZZLE = [ # Actual test puzzle as mandated by the assignment
 	... 	(1, 6, 5, 4, 3, 2),
 	... 	(1, 6, 4, 2, 5, 3),
@@ -213,13 +233,13 @@ def solve_puzzle(nuts, all=False, prune=True):
 	State: SOLUTION; C: 1/6/2/4/5/3; Placed: 1/4/6/2/3/5, 6/5/3/2/4/1, 2/1/4/3/6/5, 4/5/6/1/2/3, 5/3/1/6/4/2, 3/2/1/6/5/4; Remaining: -
 
 	>>> TEST_PUZZLE_EXTRA = [ # Additional test puzzle, known to be solvable
-	... 	(1, 2, 0, 4, 3, 5),
-	... 	(5, 2, 3, 1, 0, 4),
-	... 	(5, 2, 0, 3, 4, 1),
-	... 	(4, 2, 5, 0, 3, 1),
-	... 	(4, 2, 0, 3, 1, 5),
-	... 	(3, 2, 5, 1, 4, 0),
-	... 	(4, 2, 1, 0, 3, 5)
+	... 	(1, 3, 5, 6, 4, 2),
+    ... 	(1, 5, 2, 3, 4, 6),
+    ... 	(1, 4, 5, 3, 6, 2),
+    ... 	(1, 6, 2, 4, 3, 5),
+    ... 	(1, 3, 4, 5, 6, 2),
+    ... 	(1, 4, 2, 3, 6, 5),
+    ... 	(1, 3, 2, 6, 5, 4)
 	... ]
 	>>> solution = solve_puzzle(TEST_PUZZLE)
 	>>> solution.is_invalid()
@@ -234,20 +254,23 @@ def solve_puzzle(nuts, all=False, prune=True):
 
 	stack = LazyStack([state])
 
-	solutions = []
+	solutions = [] # only used if all=True
 
 	for state in stack:
 		is_invalid = state.is_invalid()
 		is_complete = state.is_complete()
 		next_states = state.next_states(prune=prune)
 		
-		if prune and is_invalid: continue
+		if prune and is_invalid:
+			continue
+
 		if is_complete and not is_invalid:
 			# We've found a solution!
 			if all:
 				solutions.append(state)
 			else:
 				return state
+
 		stack.push(next_states)
 	
 	if all: # we've explored everything
@@ -265,22 +288,33 @@ TEST_PUZZLE = [
 	(1, 4, 6, 2, 3, 5),
 	(1, 6, 5, 3, 2, 4),
 ]
+"""A known-solvable puzzle provided by the homework as a test case."""
 
 
-def test_solvability(n, count_solutions=True, rounds=1000, prune=True):
+def solvability_analysis(n, count_solutions=True, rounds=1000, prune=True, silent=False, quiet=False):
 	"""
 	Generate `rounds` random puzzles of degree `n`, and check how many of them have solutions.
 	
-	Prints status to the console, and returns the ratio that were solvable.
+	If quiet is True, doesn't print anything except a progress bar.
+	If silent is True, prints absolutely nothing.
+	If count_solutions is True, returns a three-element tuple representing the number of items with
+	0, 1, and 2+ solutions, respectively.
+	If count_solutions is False, returns the ratio that were solvable (from 0-1).
 	"""
 
-	print(f"Testing solvability of n = {n} by generating {rounds} random puzzles and seeing how many are solvable.")
+	if silent:
+		quiet = True # overrule argument
 
-	progress = ProgressBar()
+	if not quiet:
+		print(f"Testing solvability of n = {n} by generating {rounds} random puzzles and seeing how many are solvable.")
+
+	if not silent:
+		progress = ProgressBar()
 
 	solvable = 0
 	num_solutions = [0, 0, 0] # zero solutions, one solution, more than one solution
-	very_solvable = [] # tuples: (solution_count, state, solutions)
+	very_solvable = [] # tuples: (solution_count, state)
+	statistics = ""
 	start_time = perf_counter()
 
 	for i in range(rounds):
@@ -291,27 +325,34 @@ def test_solvability(n, count_solutions=True, rounds=1000, prune=True):
 			solvable = solvable + 1
 		
 		if count_solutions:
-			solution_count = min(2, len(solution))
-			num_solutions[solution_count] = num_solutions[solution_count] + 1
-			if solution_count == 2:
-				very_solvable.append((solution_count, puzzle, solution))
-
+			solution_count = len(solution)
+			solution_idx = min(2, solution_count)
+			num_solutions[solution_idx] = num_solutions[solution_idx] + 1
+			if solution_count >= 2:
+				very_solvable.append((solution_count, puzzle))
 
 		time_estimate = ((perf_counter() - start_time) / (i + 1)) * (rounds - (i + 1))
-		progress.update((i + 1)/rounds, f"{(i + 1):0004}/{rounds} ({round(time_estimate, 1)}s left): {'Solvable' if solution else 'Unsolvable'}")
+		statistics = f"{round(100 * solvable/(i + 1), 1)}% Solvable ({solvable:0004}/{i + 1:0004}) for n = {n}"
 
-	progress.stop(f"Done in {round(perf_counter() - start_time, 1)}s. {round(100 * solvable/rounds, 1)}% Solvable ({solvable}/{rounds}) for n = {n}")
+		if not silent:
+			progress.update((i + 1)/rounds, f"{(i + 1):0004}/{rounds} ({round(time_estimate, 1)}s left): {statistics}")
 
-	if count_solutions:
-		print(f"{num_solutions[0]} with 0 solutions, {num_solutions[1]} with 1 solution, {num_solutions[2]} with 2+ solutions (max: {max([num for num, _, _ in very_solvable]) if very_solvable else '-'}).")
+	if not silent:
+		progress.stop("" if quiet else f"Done in {round(perf_counter() - start_time, 1)}s. {statistics}")
 
-	return solvable/rounds
+	if not quiet and count_solutions:
+		print(f"{num_solutions[0]} with 0 solutions, {num_solutions[1]} with 1 solution, {num_solutions[2]} with 2+ solutions (max: {max([num for num, _ in very_solvable]) if very_solvable else '-'}).")
+
+		print("Very Solvable Puzzles (> 2 solutions):")
+		print("\n".join([str(n) + ": " + "; ".join(["/".join(map(str, nut)) for nut in puzzle]) for n, puzzle in sorted(very_solvable, key=lambda n: -n[0]) if n > 2]))
+
+	return tuple(num_solutions) if count_solutions else solvable / rounds
 
 
-def main():
-	print("Ari Porad's Solution for Homework 1, Drive Ya Nuts:")
-	state = solve_puzzle(TEST_PUZZLE)
-	print(f"Solution Found: {state}" if state else "Couldn't find a solution!")
+def print_hexnut_solution(state):
+	"""
+	Print an n = 6 solution to the console, nicely formatted.
+	"""
 
 	# What follows isn't the cleanest way I've ever seen to print out a n = 6 puzzle, but it's
 	# simple and it works.
@@ -338,21 +379,32 @@ def main():
 	""")
 
 
+def find_solvable_puzzle(n):
+	"""
+	Find a solvable puzzle of degree n.
+	"""
+
+	puzzle = None
+	solution = None
+
+	while solution is None:
+		puzzle = generate_puzzle(n)
+		solution = solve_puzzle(puzzle)
+	
+	return puzzle
+
+
+def main():
+	"""
+	Solve and print the problem perscribed by the homework.
+	"""
+	print("Ari Porad's Solution for Homework 1, Drive Ya Nuts:")
+	state = solve_puzzle(TEST_PUZZLE)
+	print(f"Solution Found: {state}")
+	print_hexnut_solution(state)
+
+
 if __name__ == "__main__":
 	import doctest
 	doctest.testmod()
-
-	print("With Pruning:")
-	test_solvability(6, prune=True)
-
-	print("Without Pruning:")
-	test_solvability(6, prune=False)
-
-	# puzzle = list(generate_puzzle(5))
-
-	# print("Randomly Generated Puzzle:", puzzle)
-	# print("Solving...")
-	# solution = solve_puzzle(puzzle)
-	# print(f"Found a Solution: {solution}" if solution else "Couldn't find a solution! Puzzle is unsolvable!")
-
-	# main()
+	main()
