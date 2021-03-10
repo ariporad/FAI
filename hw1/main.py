@@ -40,7 +40,7 @@ class State:
 	etc. This is for simplicity.
 	"""
 
-	def __init__(self, center_nut, nuts_to_place, placed_nuts = []):
+	def __init__(self, center_nut, nuts_to_place, placed_nuts = [], parent=None):
 		# Calculate the order of this puzzle
 		self.n = len(center_nut) if center_nut else len(nuts_to_place[0])
 
@@ -57,6 +57,8 @@ class State:
 		# with the number at `self.center_nut[i]`). These nuts are rotated such that their first
 		# element is the one touching the center nut.
 		self.placed_nuts = placed_nuts
+
+		self.parent = parent
 
 	def __str__(self):
 		validity = "INV" if self.is_invalid() else "VALD"
@@ -158,7 +160,7 @@ class State:
 		# If there's no center nut, then the next states are just using every possible nut as the center
 		if not self.center_nut:
 			yield from map(
-				lambda center: State(center, [nut for nut in self.nuts_to_place if nut != center], []),
+				lambda center: State(center, [nut for nut in self.nuts_to_place if nut != center], [], parent=self),
 				self.nuts_to_place
 			)
 			return
@@ -175,7 +177,7 @@ class State:
 				nut_rotated = rotate(nut, nut.index(self.center_nut[i]))
 				new_placed[i] = nut_rotated
 
-				possible_state = State(self.center_nut, others_to_place, new_placed)
+				possible_state = State(self.center_nut, others_to_place, new_placed, parent=self)
 
 				if prune and possible_state.is_invalid():
 					continue

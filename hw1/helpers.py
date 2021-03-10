@@ -1,3 +1,8 @@
+"""
+This file contains a number of helper utilities that are neither particularly interesting, but are
+needed. None contain any domain knowledge.
+"""
+
 def permute(items):
 	"""
 	Lazily produce all possible permutations of items.
