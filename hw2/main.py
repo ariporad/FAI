@@ -18,6 +18,10 @@ class Player(Enum):
 	@property
 	def short_str(self):
 		return "B" if self == Player.BLACK else "W"
+	
+	@property
+	def long_str(self):
+		return "Black" if self == Player.BLACK else "White"
 
 
 PositionState = Literal[-1, 0, 1] # -1 = opponent, 0 = no checker, 1 = our checker
@@ -130,18 +134,101 @@ class GameState:
 		# KLUDGE: Currently, roll can be negative so that a GameState can be losslessly swapped. I'm
 		# not sure if that's the right way to do it.
 		assert abs(self.roll) <= self.config.die_size and abs(self.roll) >= 1, "roll must be in range [1, die_size]"
+
+	def print_board(self):
+		"""
+        Print a human-readable view of the board.
+
+        >>> GameState(player=Player.BLACK, roll=3, board=[0, 1, 0, 0, -1, 0], checkers_in_goal=(1, -1), config=GameConfiguration(6, 5, 6)).print_board()
+                     Black →                            
+        Goal → ●     |  ▼  ▼  ▼  ▼  ▼  ▼  |     ○ ← Goal
+                     |     ○        ●     |             
+        Home → ○○○   |  ▲  ▲  ▲  ▲  ▲  ▲  |   ●●● ← Home
+                                    ← White             
+        >>> GameState(player=Player.BLACK, roll=3, board=[0, 0, 0, 0, 0, 0], checkers_in_goal=(0, 0), config=GameConfiguration(6, 5, 6)).print_board()
+                     Black →                            
+        Goal →       |  ▼  ▼  ▼  ▼  ▼  ▼  |       ← Goal
+                     |                    |             
+        Home → ○○○○○ |  ▲  ▲  ▲  ▲  ▲  ▲  | ●●●●● ← Home
+                                    ← White             
+        >>> GameState(player=Player.BLACK, roll=3, board=[0, 0, 0, 0, 0, 0], checkers_in_goal=(5, -5), config=GameConfiguration(6, 5, 6)).print_board()
+                     Black →                            
+        Goal → ●●●●● |  ▼  ▼  ▼  ▼  ▼  ▼  | ○○○○○ ← Goal
+                     |                    |             
+        Home →       |  ▲  ▲  ▲  ▲  ▲  ▲  |       ← Home
+                                    ← White             
+        >>> GameState(player=Player.BLACK, roll=3, board=[-1, 1, -1, 1, -1, 1], checkers_in_goal=(1, -1), config=GameConfiguration(6, 5, 6)).print_board()
+                     Black →                            
+        Goal → ●     |  ▼  ▼  ▼  ▼  ▼  ▼  |     ○ ← Goal
+                     |  ●  ○  ●  ○  ●  ○  |             
+        Home → ○     |  ▲  ▲  ▲  ▲  ▲  ▲  |     ● ← Home
+                                    ← White             
+        """
+		checker_symbols = {
+			 0: ' ',
+			 1: '○' if self.player == Player.BLACK else '●',
+			-1: '○' if self.player == Player.WHITE else '●'
+		}
+		board_checkers = '|  ' +  '  '.join([checker_symbols[checker] for checker in self.board]) + '  |'
+
+
+		board_top = '| ' + ' ▼ ' * self.config.board_size + ' |'
+		board_bottom = '| ' + ' ▲ ' * self.config.board_size + ' |'
+
+		# NOTE: left_top/left_bottom and right_top/right_bottom are the same length
+		left_top = 'Goal → ' + (checker_symbols[-1] * -self.checkers_in_goal[1]).ljust(self.config.checkers_per_player, ' ') + ' '
+		right_top = ' ' + (checker_symbols[1] * self.checkers_in_goal[0]).rjust(self.config.checkers_per_player, ' ') + ' ← Goal'
+
+		left_bottom = 'Home → ' + (checker_symbols[1] * self.checkers_at_home[0]).ljust(self.config.checkers_per_player, ' ') + ' '
+		right_bottom = ' ' + (checker_symbols[-1] * -self.checkers_at_home[1]).rjust(self.config.checkers_per_player, ' ') + ' ← Home'
+
+		top_line = left_top + board_top + right_top
+		bottom_line = left_bottom + board_bottom + right_bottom
+
+		line_len = len(bottom_line)
+
+		mid_line = ((' ' * len(left_bottom)) + board_checkers).ljust(line_len, ' ')
+
+		print(((' ' * len(left_top)) + self.player.long_str + ' →').ljust(line_len, ' '))
+		print(top_line)
+		print(mid_line)
+		print(bottom_line) 
+		print(('← ' + self.player.swapped.long_str + (' ' * len(right_bottom))).rjust(line_len, ' '))
 	
 	@property
 	def checkers_on_board(self) -> Tuple[int, int]: # first item is ours, positive; second is theirs, negative
+		"""
+		Return the number of checkers on the board for each player. The first element is a positive
+		number representing the number of checkers we have, the second is a negative number
+		representing the number our opponent has.
+
+		>>> GameState(player=Player.BLACK, roll=3, board=[0, 1, 0, 0, -1, 0], checkers_in_goal=(1, -1)).checkers_on_board
+		(1, -1)
+		>>> GameState(player=Player.BLACK, roll=3, board=[0, 1, 0, 0, -1, 0], checkers_in_goal=(0, 0)).checkers_on_board
+		(1, -1)
+		>>> GameState(player=Player.BLACK, roll=3, board=[0, 1, -1, 1, -1, 0], checkers_in_goal=(0, 0)).checkers_on_board
+		(2, -2)
+		"""
 		return (self.board.count(1), -self.board.count(-1))
 
 	@property
 	def checkers_at_home(self) -> Tuple[int, int]: # first item is ours, positive; second is theirs, negative
-		return tuple([
-			self.config.checkers_per_player - on_board - in_goal
-			for on_board, in_goal
-			in zip(self.checkers_on_board, self.checkers_in_goal)
-		])
+		"""
+		Return the number of checkers at home for each player. The first element is a positive
+		number representing the number of checkers we have, the second is a negative number
+		representing the number our opponent has.
+
+		>>> GameState(player=Player.BLACK, roll=3, board=[0, 1, 0, 0, -1, 0], checkers_in_goal=(1, -1)).checkers_at_home
+		(1, -1)
+		>>> GameState(player=Player.BLACK, roll=3, board=[0, 1, 0, 0, -1, 0], checkers_in_goal=(0, 0)).checkers_at_home
+		(2, -2)
+		>>> GameState(player=Player.BLACK, roll=3, board=[0, 1, -1, 1, -1, 0], checkers_in_goal=(0, 0)).checkers_at_home
+		(1, -1)
+		"""
+		return (
+			self.config.checkers_per_player - self.checkers_on_board[0] - self.checkers_in_goal[0],
+			-self.config.checkers_per_player - self.checkers_on_board[1] - self.checkers_in_goal[1]
+		)
 	
 	def __str__(self):
 		def format_position(pos):
