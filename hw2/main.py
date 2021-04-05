@@ -8,6 +8,9 @@ from abc import ABC, abstractmethod
 # Question: a number of my functions don't have the same names as the ones perscribed. Is that OK?
 
 class Player(Enum):
+	"""
+	An enum representing both options for players (Black and White).
+	"""
 	BLACK = 'BLACK'
 	WHITE = 'WHITE'
 
@@ -17,18 +20,43 @@ class Player(Enum):
 
 	@property
 	def short_str(self):
+		"""
+		A very short (ie. one letter) symbol identifying the player, mostly used for debugging.
+		"""
 		return "B" if self == Player.BLACK else "W"
 	
 	@property
 	def long_str(self):
+		"""
+		Human-readable name of this player.
+		"""
 		return "Black" if self == Player.BLACK else "White"
 
 
 PositionState = Literal[-1, 0, 1] # -1 = opponent, 0 = no checker, 1 = our checker
+"""
+Represents one position on the board.
+
+-1 = opponent's checker, 1 = our checker, 0 = empty
+"""
+
 BoardState = Tuple[PositionState, ...]
+"""
+Represents the board, relative to a player. Each element is one position. A player's checkers move
+from left to right, meaning that the home is at position -1 and the goal is at position length + 1.
+
+Obviously, the reverse is true for the opponent.
+"""
 
 @dataclass(frozen=True)
 class GameConfiguration:
+	"""
+	A data class representing the particular variant of Nanon we're playing. Completely immutable.
+
+	The defaults represent standard Nanon, with a 6 positions on the board, 3 checkers per player,
+	and a standard six-sided die.
+	"""
+
 	board_size: int = 6
 	checkers_per_player: int = 3
 	die_size: int = 6
@@ -45,6 +73,8 @@ class Dicestream(Iterator[int]):
 	"""
 	An iterator representing a stream of dice rolls. Each roll is an integer between 1 and die_size,
 	inclusive.
+
+	This is just a wrapper around another Iterator to enable specifying a die_size.
 	"""
 
 	die_size: int
@@ -122,18 +152,42 @@ def first_roll(dicestream: Dicestream) -> int:
 
 @dataclass(frozen=True)
 class GameState:
+	"""
+	A dataclass representing the current state of the game. Completely immutable.
+	"""
+
 	player: Player
+	""" Who's turn is it? """
+
 	roll: int
+	"""
+	What did the current player roll?
+	
+	KLUDGE: Currently, roll can be negative so that a GameState can be losslessly swapped. I'm not
+	sure if that's the right way to do it.
+	"""
+
+	# TODO: clarify if this is before or after the turn is taken
 	board: BoardState
+	""" What is the state of the board? """
+
 	checkers_in_goal: Tuple[int, int] = (0, 0) # first item is ours, positive; second is theirs, negative
+	""" How many checkers have been scored in the goal? """
+
 	config: GameConfiguration = GameConfiguration()
+	""" The configuration representing the variant of Nanon we're playing. """
+
 	dicestream: Dicestream = Dicestream.random(die_size=config.die_size)
+	"""
+	The dicestream we're using. Importantly, this is only touched once at creation time when this
+	turn's roll is calculated.
+	"""
 
 	def __post_init__(self):
+		# Sanity Checks
 		assert self.dicestream.die_size == self.config.die_size, "dicestream's die size must match game config's die_size!"
-		# KLUDGE: Currently, roll can be negative so that a GameState can be losslessly swapped. I'm
-		# not sure if that's the right way to do it.
 		assert abs(self.roll) <= self.config.die_size and abs(self.roll) >= 1, "roll must be in range [1, die_size]"
+
 
 	def print_board(self):
 		"""
@@ -195,12 +249,15 @@ class GameState:
 		print(bottom_line) 
 		print(('← ' + self.player.swapped.long_str + (' ' * len(right_bottom))).rjust(line_len, ' '))
 	
+
 	@property
 	def checkers_on_board(self) -> Tuple[int, int]: # first item is ours, positive; second is theirs, negative
 		"""
 		Return the number of checkers on the board for each player. The first element is a positive
 		number representing the number of checkers we have, the second is a negative number
 		representing the number our opponent has.
+
+		We derive this information from the board itself to avoid inconsistent states.
 
 		>>> GameState(player=Player.BLACK, roll=3, board=[0, 1, 0, 0, -1, 0], checkers_in_goal=(1, -1)).checkers_on_board
 		(1, -1)
@@ -211,12 +268,15 @@ class GameState:
 		"""
 		return (self.board.count(1), -self.board.count(-1))
 
+
 	@property
 	def checkers_at_home(self) -> Tuple[int, int]: # first item is ours, positive; second is theirs, negative
 		"""
 		Return the number of checkers at home for each player. The first element is a positive
 		number representing the number of checkers we have, the second is a negative number
 		representing the number our opponent has.
+
+		We derive this information to avoid inconsistent states.
 
 		>>> GameState(player=Player.BLACK, roll=3, board=[0, 1, 0, 0, -1, 0], checkers_in_goal=(1, -1)).checkers_at_home
 		(1, -1)
@@ -230,6 +290,7 @@ class GameState:
 			-self.config.checkers_per_player - self.checkers_on_board[1] - self.checkers_in_goal[1]
 		)
 	
+
 	def __str__(self):
 		def format_position(pos):
 			if pos == 1:
@@ -239,6 +300,7 @@ class GameState:
 			else:
 				return "_"
 		return f"<GameState{self.config} {self.player.short_str}{self.roll} {self.checkers_in_goal[1]}[{''.join(map(format_position, self.board))}]{self.checkers_in_goal[0]}>"
+
 
 
 	@property
@@ -261,6 +323,7 @@ class GameState:
 			checkers_in_goal=swap(self.checkers_in_goal)
 		)
 	
+
 	@property
 	def winner(self):
 		"""
@@ -283,9 +346,11 @@ class GameState:
 			return 0
 
 
+
 def start_game(dicestream: Dicestream = None, config: GameConfiguration = GameConfiguration(), seed: int = None):
 	"""
 	Create a starting game state.
+
 	>>> print(start_game(Dicestream.fixed([1, 2])))
 	<GameState{6,3,6} W1 0[++__--]0>
 	>>> print(start_game(Dicestream.fixed([1, 2]), config=GameConfiguration(6, 3, 6)))
@@ -320,6 +385,7 @@ def start_game(dicestream: Dicestream = None, config: GameConfiguration = GameCo
 
 if __name__ == "__main__":
 	import doctest
+	# Run all the unit tests
 	failures, tests = doctest.testmod()
 	if failures == 0 and tests > 0:
 		print("Tests Passed!")
