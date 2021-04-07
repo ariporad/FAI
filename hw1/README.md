@@ -39,3 +39,20 @@ The pruning algorithm can be disabled by calling `solve_puzzle(nuts, prune=False
 By calling `solve_puzzle(nuts, all=True)`, the solver can be configured to find all possible solutions to a problem instead of just the first one. This obviously increases the runtime substantially, but allows some interesting analysis. Additionally, the function `solvability_analysis(n)` performs some analysis on a large number (1000 by default, but configurable with the `rounds=` parameter) of randomly-generated puzzles of degree `n`, counting the number of solutions that each one has and returning some summary statistics. In conducting this analysis, there would occassionally be puzzles that had substantially more solutions than average. In particular, there were occasionally `n = 6` puzzles with 6 solutions. Once, there was the following 6th-order puzzle with _eight_ solutions, which I thought was impressive. These results can be seen in more detail in the report ([Jupyter Notebook](report.ipynb), [PDF](report.pdf)).
 
 ![Solvability of nut puzzles by order](nuts-by-order.png)
+
+## Unit Testing
+
+Most of the program's important logic is unit-tested using the lightweight Python module [doctest][]. To run them, do either of the following (both output nothing test-related unless one or more tests fail):
+
+```bash
+# Preferred, runs tests for helpers too.
+$ python3 -m doctest *.py
+
+# For convenience, runs tests for the main file only (which is most of the important
+# ones), then runs the program itself.
+# NOTE: This will continue to run the solving algorithm even if the tests fail,
+# although the failures will be logged to the console.
+$ python3 main.py
+```
+
+[doctest]: https://docs.python.org/3/library/doctest.html 'Python doctest'
