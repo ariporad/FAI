@@ -5,6 +5,10 @@ from random import Random
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
+# TODO: rename GameState to Turn
+# TODO: I think it might be best to refactor this into a representation where there's a list of
+#       token positions, from which is derived the board, etc.
+
 # Question: a number of my functions don't have the same names as the ones perscribed. Is that OK?
 
 class Player(Enum):
