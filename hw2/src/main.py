@@ -161,7 +161,7 @@ class Turn:
             assert rolls is None, "rolls cannot be provided if dicestream is provided"
         
         if roll is None:
-            roll = next(dicestream)
+            roll = dicestream.roll()
         
         # Sanity Checks
         assert config.checkers_per_player < config.die_size, "checkers per player must be less than die size to avoid stalemates"
@@ -170,7 +170,7 @@ class Turn:
         assert is_unique([
             (
                 checker.position.index if checker.player == Player.BLACK else (
-                        config.board_size - checker.position.index - 1))
+                    config.board_size - checker.position.index - 1))
             for checker in checkers if checker.position.is_concrete]), "two checkers on the same spot!"
         
         self.perspective = perspective
@@ -322,6 +322,69 @@ class Turn:
             return -1
         else:
             return None
+    
+    @dataclass(frozen=True)
+    class Move:
+        turn: 'Turn'
+        checker: Checker
+        to: Checker.Position
+    
+    @property
+    def open_positions(self) -> Iterator[Checker.Position]:
+        """
+        A list of open positions which the perspective's player _could_ move a checker to, if they had a suitable roll.
+        
+        NOTE: This method does not take into account the number of checkers per player.
+        
+        >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.BLACK, roll=3, board=('BBBWWW', '------', '')).open_positions]))
+        '0, 1, 2, 3, 4, 5, GOAL'
+        >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.BLACK, roll=3, board=('BWWW',   '-B---B', '')).open_positions]))
+        '0, 2, 3, 4, GOAL'
+        >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.BLACK, roll=3, board=('BBB',    '--WW-W', '')).open_positions]))
+        '0, 1, 4, 5, GOAL'
+        
+        And for white (remember that the positions returned are relative to white's side of the board, so they'll be
+        inverted from black's side).
+        >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.WHITE, roll=3, board=('BWW',    'BB---W', '')).open_positions]))
+        '1, 2, 3, GOAL'
+        >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.WHITE, roll=3, board=('WB',     'WW--BB', '')).open_positions]))
+        '2, 3, GOAL'
+        >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.WHITE, roll=3, board=('B',      'WBW-WB', '')).open_positions]))
+        '0, 2, 4, GOAL'
+        """
+        # The goal is always open
+        yield Checker.Position.GOAL
+        
+        # Check all the other spots
+        for i in range(0, self.config.board_size):
+            if self.linear_checkers.board[i] is not None:  # Definitely open if spot is empty
+                if self.linear_checkers.board[i].player == self.perspective:  # Can't move where there's Checker
+                    continue
+                
+                if self.linear_checkers.board[i].player == self.perspective.swapped:
+                    # Check for primes (two opponent pieces next to each other are protected)
+                    if i > 0 and self.linear_checkers.board[i - 1] is not None and \
+                            self.linear_checkers.board[i - 1].player == self.perspective.swapped:
+                        continue
+                    if i + 1 < len(self.linear_checkers.board) and self.linear_checkers.board[i + 1] is not None and \
+                            self.linear_checkers.board[i + 1].player == self.perspective.swapped:
+                        continue
+                
+            yield Checker.Position(i)
+    
+    @property
+    def legal_moves(self, roll) -> List[Move]:
+        # (LEGALMOVES POS ROLL) returns the position that player1 can move from with the current roll. This may be a
+        # list of 0(nil), 1, 2 or 3 values indicating the board positions of player1's checkers. You might make a module
+        # first which determines where player1 can land on the board (i.e. not on player 1 checkers or player 2 checkers
+        # next to each other)
+        #
+        # Players start checkers at opposite ends of the board, take turns rolling one die, and, if possible, MUST move
+        # one checker forward the number of steps given, or off the board. To determine who goes first, both players
+        # roll their dice, and the winner gets the difference between the rolls (in case of tie, roll again). A checker
+        # cannot legally land on another checker of the same color, nor on any of the opponent which are protected by an
+        # adjacent checker on the board. Landing on a singleton opponent checker hits it back off the board.
+        pass
 
 
 def start_game(dicestream: Dicestream = None, rolls: List[int] = None, seed: int = None,
@@ -350,7 +413,7 @@ def start_game(dicestream: Dicestream = None, rolls: List[int] = None, seed: int
         assert seed is None, "seed cannot be provided if dicestream is provided"
         assert rolls is None, "rolls cannot be provided if dicestream is provided"
     
-    starting_roll = first_roll(dicestream)
+    starting_roll = dicestream.first_roll()
     starting_player = Player.BLACK
     if starting_roll < 0:
         starting_roll *= -1
@@ -364,30 +427,11 @@ def start_game(dicestream: Dicestream = None, rolls: List[int] = None, seed: int
     # Black's home is always on the left
     board = ('B' * checkers_start_on_board) + ('-' * blank_spaces) + ('W' * checkers_start_on_board)
     
-    initial_state = Turn(board=('BW' * checkers_at_home, board, ''), roll=starting_roll, player=starting_player, perspective=perspective,
+    initial_state = Turn(board=('BW' * checkers_at_home, board, ''), roll=starting_roll, player=starting_player,
+                         perspective=perspective,
                          config=config, dicestream=dicestream)
     
     return initial_state
-
-
-def first_roll(dicestream: Dicestream) -> int:
-    """
-    Calculate the first roll of the game, as follows: two dice are rolled, and the difference is
-    returned. In the event of a tie, re-roll the dice. This may result in either a positive or
-    negative number, which should be interpreted as in favor of one player or another. Which player
-    is which doesn't matter, by definition.
-
-    >>> first_roll(Dicestream.fixed([1, 5]))
-    -4
-    >>> first_roll(Dicestream.fixed([2, 2, 3, 3, 4, 2]))
-    2
-    """
-    diff = next(dicestream) - next(dicestream)
-    
-    if diff == 0:
-        return first_roll(dicestream)
-    
-    return diff
 
 
 if __name__ == "__main__":
