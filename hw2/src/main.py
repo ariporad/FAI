@@ -99,6 +99,16 @@ class BoardDescription(NamedTuple):
         return checkers
 
 
+@dataclass(frozen=True)
+class Move:
+    turn: 'Turn'
+    checker: Checker
+    to: Checker.Position
+    
+    def __str__(self):
+        return f"Move({self.checker.player.short_str}: {self.checker.position.debug_str} -> {self.to.debug_str})"
+
+
 class Turn:
     """
     A dataclass representing a turn of the game. Completely immutable.
@@ -323,26 +333,49 @@ class Turn:
         else:
             return None
     
-    @dataclass(frozen=True)
-    class Move:
-        turn: 'Turn'
-        checker: Checker
-        to: Checker.Position
-    
+    def is_open(self, position: Checker.Position) -> bool:
+        """
+        Check if the perspective's player _could_ move a checker to the given position, if they had a suitable roll.
+        
+        NOTE: This method does not take into account if the player has the checker to move, nor if it's their turn.
+        """
+        
+        if position == Checker.Position.GOAL:  # The goal is always open
+            return True
+        elif position == Checker.Position.HOME:  # The home is never open
+            return False
+        else:
+            if self.linear_checkers.board[position] is None:  # Definitely open if spot is empty
+                return True
+            elif self.linear_checkers.board[position].player == self.perspective:  # Can't move where we have a Checker
+                return False
+            elif self.linear_checkers.board[position].player == self.perspective.swapped:
+                # Check for primes (two opponent pieces next to each other are protected)
+                if position.index > 0 and \
+                    self.linear_checkers.board[position.index - 1] is not None and \
+                    self.linear_checkers.board[position.index - 1].player == self.perspective.swapped:
+                    return False
+                elif position.index + 1 < len(self.linear_checkers.board) and \
+                    self.linear_checkers.board[position.index + 1] is not None and \
+                    self.linear_checkers.board[position.index + 1].player == self.perspective.swapped:
+                    return False
+                else:
+                    return True
+                
     @property
     def open_positions(self) -> Iterator[Checker.Position]:
         """
-        A list of open positions which the perspective's player _could_ move a checker to, if they had a suitable roll.
-        
-        NOTE: This method does not take into account the number of checkers per player.
-        
+        Return all the positions that  the perspective's player _could_ move a checker to, if they had a suitable roll.
+
+        NOTE: This method does not take into account if the player has the checker to move, nor if it's their turn.
+
         >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.BLACK, roll=3, board=('BBBWWW', '------', '')).open_positions]))
         '0, 1, 2, 3, 4, 5, GOAL'
         >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.BLACK, roll=3, board=('BWWW',   '-B---B', '')).open_positions]))
         '0, 2, 3, 4, GOAL'
         >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.BLACK, roll=3, board=('BBB',    '--WW-W', '')).open_positions]))
         '0, 1, 4, 5, GOAL'
-        
+
         And for white (remember that the positions returned are relative to white's side of the board, so they'll be
         inverted from black's side).
         >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.WHITE, roll=3, board=('BWW',    'BB---W', '')).open_positions]))
@@ -357,23 +390,30 @@ class Turn:
         
         # Check all the other spots
         for i in range(0, self.config.board_size):
-            if self.linear_checkers.board[i] is not None:  # Definitely open if spot is empty
-                if self.linear_checkers.board[i].player == self.perspective:  # Can't move where there's Checker
-                    continue
-                
-                if self.linear_checkers.board[i].player == self.perspective.swapped:
-                    # Check for primes (two opponent pieces next to each other are protected)
-                    if i > 0 and self.linear_checkers.board[i - 1] is not None and \
-                            self.linear_checkers.board[i - 1].player == self.perspective.swapped:
-                        continue
-                    if i + 1 < len(self.linear_checkers.board) and self.linear_checkers.board[i + 1] is not None and \
-                            self.linear_checkers.board[i + 1].player == self.perspective.swapped:
-                        continue
-                
-            yield Checker.Position(i)
+            position = Checker.Position(i)
+            if self.is_open(position):
+                yield position
     
     @property
-    def legal_moves(self, roll) -> List[Move]:
+    def legal_moves(self) -> Iterator[Move]:
+        """
+        Returns all legal moves for the current player from the current state.
+        
+        NOTE: This method can only be called when the perspective player is the same as the current player.
+        
+        >>> print_each(Turn(perspective=Player.BLACK, roll=3, board=('BBBWWW', '------', '')).legal_moves)
+        Move(B: HOME -> 2)
+        >>> print_each(Turn(perspective=Player.BLACK, roll=1, board=('', 'BWWBWB', '')).legal_moves)
+        Move(B: 3 -> 4)
+        Move(B: 5 -> GOAL)
+        >>> print_each(Turn(perspective=Player.WHITE, player=Player.WHITE, roll=1, board=('', 'BWWBWB', '')).legal_moves)
+        Move(W: 1 -> 2)
+        Move(W: 4 -> 5)
+        >>> print_each(Turn(perspective=Player.WHITE, player=Player.WHITE, roll=3, board=('WBBB', '--W-W-', '')).legal_moves)
+        Move(W: 1 -> 4)
+        Move(W: 3 -> GOAL)
+        Move(W: HOME -> 2)
+        """
         # (LEGALMOVES POS ROLL) returns the position that player1 can move from with the current roll. This may be a
         # list of 0(nil), 1, 2 or 3 values indicating the board positions of player1's checkers. You might make a module
         # first which determines where player1 can land on the board (i.e. not on player 1 checkers or player 2 checkers
@@ -384,7 +424,35 @@ class Turn:
         # roll their dice, and the winner gets the difference between the rolls (in case of tie, roll again). A checker
         # cannot legally land on another checker of the same color, nor on any of the opponent which are protected by an
         # adjacent checker on the board. Landing on a singleton opponent checker hits it back off the board.
-        pass
+        assert self.player == self.perspective, "only the current player has legal moves!"
+        
+        # All checkers at home are equivalent, so we want to only generate moves for one of them
+        had_checker_at_home = False
+        
+        for checker in self.checkers:
+            # We can't move our opponent's checkers
+            if checker.player != self.perspective:
+                continue
+            
+            # A checker in the goal never moves
+            if checker.position == Checker.Position.GOAL:
+                continue
+                
+            if checker.position == Checker.Position.HOME:
+                if not had_checker_at_home:
+                    had_checker_at_home = True
+                else:
+                    continue
+            
+            to_idx = self.roll + (checker.position.index if checker.position != Checker.Position.HOME else -1)
+            
+            if to_idx < self.config.board_size:
+                to_pos = Checker.Position(to_idx)
+            else:
+                to_pos = Checker.Position.GOAL
+            
+            if self.is_open(to_pos):
+                yield Move(self, checker, to_pos)
 
 
 def start_game(dicestream: Dicestream = None, rolls: List[int] = None, seed: int = None,
