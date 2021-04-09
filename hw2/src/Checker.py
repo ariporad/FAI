@@ -1,28 +1,24 @@
 from dataclasses import dataclass
-from functools import total_ordering
-from math import inf
 from typing import *
 
 from Player import Player
 
-
-@dataclass(frozen=True)
+@dataclass
 class Checker:
     """
     An immutable data class representing a Checker.
     """
 
-    @total_ordering
-    class Position:
+    class Position(int):
         """
-        A pseudo-enum representing a checker's position. Can support either numerical positions (which
-        are always non-negative integers, where 0 is the position closest to the checker's home), or
-        abstract positions, like 'HOME', or 'GOAL'.
+        A wrapper around int representing a checker's position. Can support either numerical positions (which are always
+        non-negative integers, where 0 is the position closest to the perspective player's home), or abstract positions,
+        like 'HOME' (Checker.Position.HOME_VALUE), or 'GOAL' (Checker.Position.GOAL_VALUE).
 
         Access abstract positions like an enum:
-        >>> print(Checker.Position.HOME)
+        >>> print(Checker.Position('HOME'))
         Checker.Position(HOME)
-        >>> print(Checker.Position.GOAL)
+        >>> print(Checker.Position('GOAL'))
         Checker.Position(GOAL)
 
         Access concrete positions like a constructor:
@@ -34,78 +30,80 @@ class Checker:
         True
         >>> Checker.Position(4) == Checker.Position(5)
         False
-        >>> Checker.Position.HOME == Checker.Position.HOME
+        >>> Checker.Position('HOME') == Checker.Position('HOME')
         True
-        >>> Checker.Position.GOAL == Checker.Position.GOAL
+        >>> Checker.Position('GOAL') == Checker.Position('GOAL')
         True
-        >>> Checker.Position.HOME == Checker.Position.GOAL
+        >>> Checker.Position('HOME') == Checker.Position('GOAL')
         False
-        >>> Checker.Position.GOAL == Checker.Position.HOME
+        >>> Checker.Position('GOAL') == Checker.Position('HOME')
         False
 
-        Concrete Checker.Positions' values can be accessed with .index, or can be casted to/from ints:
-        >>> Checker.Position(4).index
+        Concrete Checker.Positions' values can be accessed with , or can be casted to/from ints:
+        >>> Checker.Position(4)
         4
         >>> ['Zero', 'One', 'Two', 'Three'][Checker.Position(2)]
         'Two'
 
         Abstract Checker.Positions will raise an exception if you try to do this:
-        >>> Checker.Position.HOME.index
+        >>> Checker.Position('HOME')
         Traceback (most recent call last):
             ...
         AssertionError: Can't get the index of abstract Checker.Position! You should check for this!
-        >>> ['Zero', 'One', 'Two', 'Three'][Checker.Position.HOME]
+        >>> ['Zero', 'One', 'Two', 'Three'][Checker.Position('HOME')]
         Traceback (most recent call last):
             ...
         AssertionError: Can't get the index of abstract Checker.Position! You should check for this!
         """
-
-        # These will be initialized later, they're just here for typing
-        HOME = None  # type: 'Position'
-        GOAL = None  # type: 'Position'
-
-        def __init__(self, value: int, abstract_label: Optional[str] = None):
-            self.is_concrete = not abstract_label
-            self._value = value
-            self._label = abstract_label
+        
+        HOME_VALUE = -1
+        GOAL_VALUE = 100  # this just needs to be bigger than any other position
+        
+        Value = Union[int, Literal['HOME', 'GOAL']]
+        
+        def __new__(cls, value: Value):
+            if isinstance(value, str):
+                if value == 'HOME':
+                    value = cls.HOME_VALUE
+                elif value == 'GOAL':
+                    value = cls.GOAL_VALUE
+                else:
+                    raise TypeError('Valid string values for Checker.Position are "HOME" and "GOAL".')
+            return int.__new__(cls, value)
 
         def __str__(self):
-            return f"Checker.Position({self.debug_str})"
-
-        def __eq__(self, other: 'Checker.Position'):
-            return isinstance(other, self.__class__) and other.is_concrete == self.is_concrete and (
-                other._value == self._value if self.is_concrete else other._label == self._label)
-
-        def __gt__(self, other: 'Checker.Position'):
-            return int(self) > int(other)
-
-        def __int__(self):
-            return self._value
-
-        def __index__(self):
-            return self.index
-        
-        @property
-        def debug_str(self) -> str:
-            return str(self._label or self._value)
+            return f"Checker.Position({self.name})"
 
         @property
-        def index(self) -> int:
-            assert self.is_concrete, "Can't get the index of abstract Checker.Position! You should check for this!"
-            return self._value
-        
+        def is_concrete(self) -> bool:
+            return self != Checker.Position.HOME_VALUE and self != Checker.Position.GOAL_VALUE
+    
+        @property
+        def name(self) -> str:
+            if self == Checker.Position('GOAL'):
+                return "GOAL"
+            elif self == Checker.Position('HOME'):
+                return "HOME"
+            else:
+                return int.__str__(self)
+            
 
     player: Player
     position: Position
+    
+    def __post_init__(self):
+        if not isinstance(self.position, Checker.Position):
+            self.position = Checker.Position(self.position)
 
     def __str__(self):
-        return f"Checker({self.player.short_str} @ {self.position.debug_str})"
+        return f"Checker({self.player.short_str} @ {self.position.name})"
+    
+    def __eq__(self, other):
+        return self.player == other.player and self.position == other.position
+    
+    def __ne__(self, other):
+        return not (self == other)
     
     @property
     def display_symbol(self) -> str:
         return '○' if self.player == Player.BLACK else '●'
-    
-
-
-Checker.Position.HOME = Checker.Position(-inf, abstract_label='HOME')
-Checker.Position.GOAL = Checker.Position(+inf, abstract_label='GOAL')

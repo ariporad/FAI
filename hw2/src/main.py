@@ -59,8 +59,10 @@ class BoardDescription(NamedTuple):
         >>> BoardDescription.from_checkers(board2.checkers) == board2
         True
         """
-        home = ''.join([checker.player.short_str for checker in checkers if checker.position == Checker.Position.HOME])
-        goal = ''.join([checker.player.short_str for checker in checkers if checker.position == Checker.Position.GOAL])
+        home = ''.join(
+            [checker.player.short_str for checker in checkers if checker.position == Checker.Position('HOME')])
+        goal = ''.join(
+            [checker.player.short_str for checker in checkers if checker.position == Checker.Position('GOAL')])
         
         board = ['-'] * config.board_size
         
@@ -68,8 +70,7 @@ class BoardDescription(NamedTuple):
             if not checker.position.is_concrete:
                 continue
             
-            idx = checker.position.index if checker.player == Player.BLACK else -(checker.position.index + 1)
-            board[idx] = checker.player.short_str
+            board[checker.position] = checker.player.short_str
         
         return cls(home, ''.join(board), goal)
     
@@ -77,23 +78,33 @@ class BoardDescription(NamedTuple):
     def checkers(self) -> List[Checker]:
         """
         Convert this BoardDescription to a list of Checkers.
-        >>> [str(checker) for checker in BoardDescription('BW', '--W--B', 'WB').checkers]
-        ['Checker(B @ HOME)', 'Checker(W @ HOME)', 'Checker(B @ GOAL)', 'Checker(W @ GOAL)', 'Checker(W @ 3)', 'Checker(B @ 5)']
-        >>> [str(checker) for checker in BoardDescription('', 'BWBWBW', '').checkers]
-        ['Checker(B @ 0)', 'Checker(W @ 0)', 'Checker(B @ 2)', 'Checker(W @ 2)', 'Checker(B @ 4)', 'Checker(W @ 4)']
+        >>> print_each(BoardDescription('BW', '--W--B', 'WB').checkers)
+        Checker(B @ 5)
+        Checker(B @ GOAL)
+        Checker(B @ HOME)
+        Checker(W @ 2)
+        Checker(W @ GOAL)
+        Checker(W @ HOME)
+        >>> print_each(BoardDescription('', 'BWBWBW', '').checkers)
+        Checker(B @ 0)
+        Checker(B @ 2)
+        Checker(B @ 4)
+        Checker(W @ 1)
+        Checker(W @ 3)
+        Checker(W @ 5)
         """
         checkers = []  # type: List[Checker]
         
-        checkers += [Checker(Player.BLACK, Checker.Position.HOME)] * self.home.count('B')
-        checkers += [Checker(Player.WHITE, Checker.Position.HOME)] * self.home.count('W')
+        checkers += [Checker(Player.BLACK, Checker.Position('HOME'))] * self.home.count('B')
+        checkers += [Checker(Player.WHITE, Checker.Position('HOME'))] * self.home.count('W')
         
-        checkers += [Checker(Player.BLACK, Checker.Position.GOAL)] * self.goal.count('B')
-        checkers += [Checker(Player.WHITE, Checker.Position.GOAL)] * self.goal.count('W')
+        checkers += [Checker(Player.BLACK, Checker.Position('GOAL'))] * self.goal.count('B')
+        checkers += [Checker(Player.WHITE, Checker.Position('GOAL'))] * self.goal.count('W')
         
         for i in range(0, len(self.board)):
             if self.board[i] == 'B':
                 checkers += [Checker(Player.BLACK, Checker.Position(i))]
-            if self.board[-(i + 1)] == 'W':
+            elif self.board[i] == 'W':
                 checkers += [Checker(Player.WHITE, Checker.Position(i))]
         
         return checkers
@@ -106,7 +117,37 @@ class Move:
     to: Checker.Position
     
     def __str__(self):
-        return f"Move({self.checker.player.short_str}: {self.checker.position.debug_str} -> {self.to.debug_str})"
+        return f"Move({self.checker.player.short_str}: {self.checker.position.name} -> {self.to.name})"
+    
+    def make(self) -> 'Turn':
+        """
+        Execute this move and return a new Turn.
+        
+        >>> print(next(Turn(perspective=Player.BLACK, rolls=[3, 1], board=('', 'BWWBWB', '')).legal_moves).make())
+        <Turn{6,3,6} B:W 1 - [BWW-WB] B>
+        >>> print_each(Turn(perspective=Player.BLACK, roll=1, board=('', 'BWWBWB', '')).legal_moves)
+        Move(B: 3 -> 4)
+        Move(B: 5 -> GOAL)
+        >>> print(next(Turn(perspective=Player.WHITE, player=Player.WHITE, rolls=[1, 1], board=('', 'BWWBWB', '')).legal_moves).make())
+        <Turn{6,3,6} W:B 1 B [BWWW-W] ->
+        >>> print_each(Turn(perspective=Player.WHITE, player=Player.WHITE, roll=3, board=('WBBB', '--W-W-', '')).legal_moves)
+        Move(W: 1 -> 4)
+        Move(W: 3 -> GOAL)
+        Move(W: HOME -> 2)
+        """
+        # Remove the checker that needs to be moved, and handle any captures
+        checkers = [
+            Checker(checker.player, Checker.Position('HOME')) if checker.position == self.to else checker
+            for checker in self.turn.checkers
+            if checker != self.checker
+        ]
+        
+        # Add the newly-moved checker
+        checkers += [Checker(self.checker.player, self.to)]
+        
+        return Turn(perspective=self.turn.perspective, player=self.turn.player.swapped,
+                    roll=self.turn.dicestream.roll(), checkers=checkers, config=self.turn.config,
+                    dicestream=self.turn.dicestream)
 
 
 class Turn:
@@ -157,7 +198,10 @@ class Turn:
             if isinstance(board, tuple) and not isinstance(board, BoardDescription) and len(board) == 3:
                 board = BoardDescription(board[0], board[1], board[2])
             checkers = board.checkers
-        
+            # Board descriptions are always black perspective, so we need to flip it if we're white
+            if perspective != Player.BLACK:
+                checkers = [Checker(checker.player, config.board_size - 1 - checker.position) for checker in checkers]
+            
         assert len(checkers) == config.checkers_per_player * 2, "incorrect number of checkers!"
         
         if dicestream is None:
@@ -177,11 +221,8 @@ class Turn:
         assert config.checkers_per_player < config.die_size, "checkers per player must be less than die size to avoid stalemates"
         assert dicestream.die_size == config.die_size, "dicestream's die size must match game config's die_size!"
         assert config.die_size >= abs(roll) >= 1, "roll must be in range [1, die_size]"
-        assert is_unique([
-            (
-                checker.position.index if checker.player == Player.BLACK else (
-                    config.board_size - checker.position.index - 1))
-            for checker in checkers if checker.position.is_concrete]), "two checkers on the same spot!"
+        assert is_unique([checker.position for checker in checkers if
+                          checker.position.is_concrete]), "two checkers on the same spot!"
         
         self.perspective = perspective
         self.player = player
@@ -200,13 +241,12 @@ class Turn:
         board = [None] * self.config.board_size  # type: List[Optional[Checker]]
         
         for checker in self.checkers:
-            if checker.position == Checker.Position.HOME:
+            if checker.position == Checker.Position('HOME'):
                 home.append(checker)
-            elif checker.position == Checker.Position.GOAL:
+            elif checker.position == Checker.Position('GOAL'):
                 goal.append(checker)
             else:
-                board[
-                    checker.position if checker.player == self.perspective else -(checker.position.index + 1)] = checker
+                board[checker.position] = checker
         
         return self.LinearCheckers(home=home, goal=goal, board=board)
     
@@ -297,13 +337,15 @@ class Turn:
         >>> print(Turn(perspective=Player.BLACK, player=Player.BLACK, roll=3, board=('BW', '-B--W-', 'BW')).swapped)
         <Turn{6,3,6} W:B 3 BW [-B--W-] BW>
         """
-        return Turn(perspective=self.perspective.swapped, player=self.player, roll=self.roll,
-                    checkers=self.checkers, config=self.config, dicestream=self.dicestream, )
+        checkers = [Checker(checker.player, self.config.board_size - 1 - checker.position) for checker in self.checkers]
+        return Turn(perspective=self.perspective.swapped, player=self.player, roll=self.roll, checkers=checkers,
+                    config=self.config, dicestream=self.dicestream)
     
     @property
     def is_winner(self) -> bool:
         return all([
-            checker.position == Checker.Position.GOAL for checker in self.checkers if checker.player == self.perspective
+            checker.position == Checker.Position('GOAL') for checker in self.checkers if
+            checker.player == self.perspective
         ])
     
     @property
@@ -340,9 +382,9 @@ class Turn:
         NOTE: This method does not take into account if the player has the checker to move, nor if it's their turn.
         """
         
-        if position == Checker.Position.GOAL:  # The goal is always open
+        if position == Checker.Position('GOAL'):  # The goal is always open
             return True
-        elif position == Checker.Position.HOME:  # The home is never open
+        elif position == Checker.Position('HOME'):  # The home is never open
             return False
         else:
             if self.linear_checkers.board[position] is None:  # Definitely open if spot is empty
@@ -351,17 +393,17 @@ class Turn:
                 return False
             elif self.linear_checkers.board[position].player == self.perspective.swapped:
                 # Check for primes (two opponent pieces next to each other are protected)
-                if position.index > 0 and \
-                    self.linear_checkers.board[position.index - 1] is not None and \
-                    self.linear_checkers.board[position.index - 1].player == self.perspective.swapped:
+                if position > 0 and \
+                    self.linear_checkers.board[position - 1] is not None and \
+                    self.linear_checkers.board[position - 1].player == self.perspective.swapped:
                     return False
-                elif position.index + 1 < len(self.linear_checkers.board) and \
-                    self.linear_checkers.board[position.index + 1] is not None and \
-                    self.linear_checkers.board[position.index + 1].player == self.perspective.swapped:
+                elif position + 1 < len(self.linear_checkers.board) and \
+                    self.linear_checkers.board[position + 1] is not None and \
+                    self.linear_checkers.board[position + 1].player == self.perspective.swapped:
                     return False
                 else:
                     return True
-                
+    
     @property
     def open_positions(self) -> Iterator[Checker.Position]:
         """
@@ -369,24 +411,24 @@ class Turn:
 
         NOTE: This method does not take into account if the player has the checker to move, nor if it's their turn.
 
-        >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.BLACK, roll=3, board=('BBBWWW', '------', '')).open_positions]))
+        >>> ", ".join(sorted([p.name for p in Turn(perspective=Player.BLACK, roll=3, board=('BBBWWW', '------', '')).open_positions]))
         '0, 1, 2, 3, 4, 5, GOAL'
-        >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.BLACK, roll=3, board=('BWWW',   '-B---B', '')).open_positions]))
+        >>> ", ".join(sorted([p.name for p in Turn(perspective=Player.BLACK, roll=3, board=('BWWW',   '-B---B', '')).open_positions]))
         '0, 2, 3, 4, GOAL'
-        >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.BLACK, roll=3, board=('BBB',    '--WW-W', '')).open_positions]))
+        >>> ", ".join(sorted([p.name for p in Turn(perspective=Player.BLACK, roll=3, board=('BBB',    '--WW-W', '')).open_positions]))
         '0, 1, 4, 5, GOAL'
 
         And for white (remember that the positions returned are relative to white's side of the board, so they'll be
         inverted from black's side).
-        >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.WHITE, roll=3, board=('BWW',    'BB---W', '')).open_positions]))
+        >>> ", ".join(sorted([p.name for p in Turn(perspective=Player.WHITE, roll=3, board=('BWW',    'BB---W', '')).open_positions]))
         '1, 2, 3, GOAL'
-        >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.WHITE, roll=3, board=('WB',     'WW--BB', '')).open_positions]))
+        >>> ", ".join(sorted([p.name for p in Turn(perspective=Player.WHITE, roll=3, board=('WB',     'WW--BB', '')).open_positions]))
         '2, 3, GOAL'
-        >>> ", ".join(sorted([p.debug_str for p in Turn(perspective=Player.WHITE, roll=3, board=('B',      'WBW-WB', '')).open_positions]))
+        >>> ", ".join(sorted([p.name for p in Turn(perspective=Player.WHITE, roll=3, board=('B',      'WBW-WB', '')).open_positions]))
         '0, 2, 4, GOAL'
         """
         # The goal is always open
-        yield Checker.Position.GOAL
+        yield Checker.Position('GOAL')
         
         # Check all the other spots
         for i in range(0, self.config.board_size):
@@ -435,21 +477,20 @@ class Turn:
                 continue
             
             # A checker in the goal never moves
-            if checker.position == Checker.Position.GOAL:
+            if checker.position == Checker.Position('GOAL'):
                 continue
-                
-            if checker.position == Checker.Position.HOME:
-                if not had_checker_at_home:
-                    had_checker_at_home = True
-                else:
-                    continue
             
-            to_idx = self.roll + (checker.position.index if checker.position != Checker.Position.HOME else -1)
+            if checker.position == Checker.Position('HOME'):
+                if had_checker_at_home:
+                    continue
+                had_checker_at_home = True
+            
+            to_idx = self.roll + checker.position
             
             if to_idx < self.config.board_size:
                 to_pos = Checker.Position(to_idx)
             else:
-                to_pos = Checker.Position.GOAL
+                to_pos = Checker.Position('GOAL')
             
             if self.is_open(to_pos):
                 yield Move(self, checker, to_pos)
