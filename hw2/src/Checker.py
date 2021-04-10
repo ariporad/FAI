@@ -39,27 +39,17 @@ class Checker:
         >>> Checker.Position('GOAL') == Checker.Position('HOME')
         False
 
-        Concrete Checker.Positions' values can be accessed with , or can be casted to/from ints:
-        >>> Checker.Position(4)
-        4
+        Concrete Checker.Positions are ints, so they can be used as such:
         >>> ['Zero', 'One', 'Two', 'Three'][Checker.Position(2)]
         'Two'
-
-        Abstract Checker.Positions will raise an exception if you try to do this:
         >>> Checker.Position('HOME')
-        Traceback (most recent call last):
-            ...
-        AssertionError: Can't get the index of abstract Checker.Position! You should check for this!
-        >>> ['Zero', 'One', 'Two', 'Three'][Checker.Position('HOME')]
-        Traceback (most recent call last):
-            ...
-        AssertionError: Can't get the index of abstract Checker.Position! You should check for this!
+        -1
         """
         
         HOME_VALUE = -1
         GOAL_VALUE = 100  # this just needs to be bigger than any other position
         
-        Value = Union[int, Literal['HOME', 'GOAL']]
+        Value = Union[int, Literal['HOME', 'GOAL'], 'Checker.Position']
         
         def __new__(cls, value: Value):
             if isinstance(value, str):
