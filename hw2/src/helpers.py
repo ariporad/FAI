@@ -8,7 +8,8 @@ def count(predicate: Callable[[T], bool], iterable: Iterable[Optional[T]]) -> in
 
 
 def is_unique(iterable: Iterable[T]) -> bool:
-    return len(set(iterable)) == len(iterable)
+    lst = list(iterable)
+    return len(set(lst)) == len(lst)
 
 
 def print_each(iterable: Iterable[T], stringify=str, key=None):

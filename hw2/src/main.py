@@ -21,6 +21,10 @@ class GameConfiguration(NamedTuple):
     checkers_per_player: int = 3
     die_size: int = 6
     
+    # def __new__(cls, board_size, checkers_per_player, die_size):
+    #     assert checkers_per_player < die_size, "checkers per player must be less than die size to avoid stalemates"
+    #     return super(cls, GameConfiguration).__new__(GameConfiguration, (board_size, checkers_per_player, die_size))
+
     def __str__(self):
         return f"{{{self.board_size},{self.checkers_per_player},{self.die_size}}}"
 
@@ -136,7 +140,7 @@ class Move:
     NOTE: Since Moves, Turns, Checkers, and Positions are all immutable, this class represents a possible but
     not-yet-executed move. To execute the move, call Move#make (which returns a new Turn).
     """
-    turn: 'Turn'
+    board: 'Board'
     checker: Checker
     to: Checker.Position
     
@@ -144,40 +148,38 @@ class Move:
         return f"Move({self.checker.player.short_str}: {self.checker.position.name} -> {self.to.name})"
 
     @classmethod
-    def create(cls, from_idx: Checker.Position.Value, to_idx: Checker.Position.Value, turn: 'Turn'):
+    def create(cls, from_idx: Checker.Position.Value, to_idx: Checker.Position.Value, board: 'Board'):
         """
         Convenient way to create a Move.
         """
         from_idx = Checker.Position(from_idx)
         to_idx = Checker.Position(to_idx)
-        checker = only(checker for checker in turn.checkers if checker.position == from_idx)
-        return Move(turn, checker, to_idx)
+        checker = only(checker for checker in board.checkers if checker.position == from_idx)
+        return Move(board, checker, to_idx)
 
-    def make(self) -> 'Turn':
+    def make(self) -> 'Board':
         """
         Execute this move and return a new Turn.
         
-        >>> print(Move.create(3, 4, Turn(perspective=Player.BLACK, player=Player.BLACK, rolls=[3, 1], board=('', 'BWWBWB', ''))).make())
-        <Turn{6,3,6} B:W 1 W [BWW-BB] ->
-        >>> print(Move.create(5, 'GOAL', Turn(perspective=Player.WHITE, player=Player.WHITE, rolls=[1, 1], board=('', 'BWWBWB', ''))).make())
-        <Turn{6,3,6} W:B 1 - [BWWBW-] B>
+        >>> print(Move.create(3, 4, Board(perspective=Player.BLACK, board=('', 'BWWBWB', ''))).make())
+        Board{6,3,6}(B: W [BWW-BB] -)
+        >>> print(Move.create(5, 'GOAL', Board(perspective=Player.WHITE, board=('', 'BWWBWB', ''))).make())
+        Board{6,3,6}(W: - [BWWBW-] B)
         """
         # Remove the checker that needs to be moved, and handle any captures
         checkers = [
             Checker(checker.player, Checker.Position('HOME')) if checker.position == self.to else checker
-            for checker in self.turn.checkers
+            for checker in self.board.checkers
             if checker != self.checker
         ]
         
         # Add the newly-moved checker
         checkers += [Checker(self.checker.player, self.to)]
         
-        return Turn(perspective=self.turn.perspective, player=self.turn.player.swapped,
-                    roll=self.turn.dicestream.roll(), checkers=checkers, config=self.turn.config,
-                    dicestream=self.turn.dicestream)
+        return Board(perspective=self.board.perspective, checkers=checkers, config=self.board.config)
 
 
-class Turn:
+class Board:
     """
     A dataclass representing a turn of the game. Completely immutable.
 
@@ -188,36 +190,21 @@ class Turn:
     perspective: Player
     """ From who's perspective are we looking at the board? """
     
-    player: Player
-    """ Who's turn is it? """
-    
-    roll: Optional[int]
-    """ Dice value that was rolled. If None, then the first turn hasn't been played yet. """
-    
     checkers: List[Checker]
     """ All checker is play. Always a list of length 2 * checkers_per_player """
     
     config: GameConfiguration
     """ The configuration representing the variant of Nannon we're playing. """
     
-    dicestream: Dicestream
-    """
-    The dicestream we're using. Importantly, this is only touched once at creation time when this
-    turn's roll is calculated.
-    """
-    
     def __init__(self, board: Union[BoardDescription, Tuple[str, str, str]] = None, checkers: list[Checker] = None,
-                 roll: int = None,
-                 player: Player = Player.BLACK, perspective: Player = Player.BLACK,
-                 config: GameConfiguration = GameConfiguration(),
-                 dicestream: Dicestream = None, seed: int = None, rolls: List[int] = None):
+                 perspective: Player = Player.BLACK, config: GameConfiguration = GameConfiguration()):
         """
-        >>> print(Turn(('BW', 'B----W', 'WB'), seed=1))
-        <Turn{6,3,6} B:B 2 BW [B----W] BW>
-        >>> print(Turn(('', 'BWBWBW', ''), seed=1))
-        <Turn{6,3,6} B:B 2 - [BWBWBW] ->
-        >>> print(Turn(('', 'BWB--WBW', ''), seed=1, config=GameConfiguration(8, 3, 6)))
-        <Turn{8,3,6} B:B 2 - [BWB--WBW] ->
+        >>> print(Board(('BW', 'B----W', 'WB')))
+        Board{6,3,6}(B: BW [B----W] BW)
+        >>> print(Board(('', 'BWBWBW', '')))
+        Board{6,3,6}(B: - [BWBWBW] -)
+        >>> print(Board(('', 'BWB--WBW', ''), config=GameConfiguration(8, 3, 6)))
+        Board{8,3,6}(B: - [BWB--WBW] -)
         """
         assert board is None or checkers is None, "can only provide board OR checkers, not both!"
         
@@ -228,63 +215,44 @@ class Turn:
 
         assert len(checkers) == config.checkers_per_player * 2, "incorrect number of checkers!"
         
-        if dicestream is None:
-            if rolls is not None:
-                dicestream = Dicestream.fixed(rolls)
-                assert seed is None, "seed cannot be provided if rolls is provided"
-            else:
-                dicestream = Dicestream.random(config.die_size, seed)
-        else:
-            assert seed is None, "seed cannot be provided if dicestream is provided"
-            assert rolls is None, "rolls cannot be provided if dicestream is provided"
-        
-        if roll is None:
-            roll = dicestream.roll()
-        
         # Sanity Checks
-        assert config.checkers_per_player < config.die_size, "checkers per player must be less than die size to avoid stalemates"
-        assert dicestream.die_size == config.die_size, "dicestream's die size must match game config's die_size!"
-        assert config.die_size >= abs(roll) >= 1, "roll must be in range [1, die_size]"
-        assert is_unique([checker.position for checker in checkers if
-                          checker.position.is_concrete]), "two checkers on the same spot!"
+        assert is_unique([checker.position for checker in checkers if checker.position.is_concrete]), \
+            "two checkers on the same spot!"
         
         self.perspective = perspective
-        self.player = player
-        self.roll = roll
         self.checkers = checkers
         self.config = config
-        self.dicestream = dicestream
     
-    def print_board(self):
+    def print(self):
         """
         Print a human-readable view of the board.
 
-        >>> Turn(perspective=Player.BLACK, player=Player.BLACK, roll=3, board=('BBBWWW', '-B--W-', 'BW'), config=GameConfiguration(6, 5, 6)).print_board()
+        >>> Board(perspective=Player.BLACK, board=('BBBWWW', '-B--W-', 'BW'), config=GameConfiguration(6, 5, 6)).print()
                      Black →
         Goal → ●     |  ▼  ▼  ▼  ▼  ▼  ▼  |     ○ ← Goal
                      |     ○        ●     |
         Home → ○○○   |  ▲  ▲  ▲  ▲  ▲  ▲  |   ●●● ← Home
                                     ← White
-        >>> Turn(perspective=Player.BLACK, player=Player.BLACK, roll=3, board=('BBBBBWWWWW', '------', ''), config=GameConfiguration(6, 5, 6)).print_board()
+        >>> Board(perspective=Player.BLACK, board=('BBBBBWWWWW', '------', ''), config=GameConfiguration(6, 5, 6)).print()
                      Black →
         Goal →       |  ▼  ▼  ▼  ▼  ▼  ▼  |       ← Goal
                      |                    |
         Home → ○○○○○ |  ▲  ▲  ▲  ▲  ▲  ▲  | ●●●●● ← Home
                                     ← White
-        >>> Turn(perspective=Player.BLACK, player=Player.BLACK, roll=3, board=('', '------', 'BBBBBWWWWW'), config=GameConfiguration(6, 5, 6)).print_board()
+        >>> Board(perspective=Player.BLACK, board=('', '------', 'BBBBBWWWWW'), config=GameConfiguration(6, 5, 6)).print()
                      Black →
         Goal → ●●●●● |  ▼  ▼  ▼  ▼  ▼  ▼  | ○○○○○ ← Goal
                      |                    |
         Home →       |  ▲  ▲  ▲  ▲  ▲  ▲  |       ← Home
                                     ← White
-        >>> Turn(perspective=Player.BLACK, player=Player.BLACK, roll=3, board=('BW', 'WBWBWB', 'BW'), config=GameConfiguration(6, 5, 6)).print_board()
+        >>> Board(perspective=Player.BLACK, board=('BW', 'WBWBWB', 'BW'), config=GameConfiguration(6, 5, 6)).print()
                      Black →
         Goal → ●     |  ▼  ▼  ▼  ▼  ▼  ▼  |     ○ ← Goal
                      |  ●  ○  ●  ○  ●  ○  |
         Home → ○     |  ▲  ▲  ▲  ▲  ▲  ▲  |     ● ← Home
                                     ← White
 
-        >>> Turn(perspective=Player.WHITE, player=Player.BLACK, roll=3, board=('BW', 'WBWBWB', 'BW'), config=GameConfiguration(6, 5, 6)).print_board()
+        >>> Board(perspective=Player.WHITE, board=('BW', 'WBWBWB', 'BW'), config=GameConfiguration(6, 5, 6)).print()
                      White →
         Goal → ○     |  ▼  ▼  ▼  ▼  ▼  ▼  |     ● ← Goal
                      |  ●  ○  ●  ○  ●  ○  |
@@ -337,55 +305,55 @@ class Turn:
     def __str__(self):
         home, board, goal = BoardDescription.from_checkers(self.checkers, config=self.config)
         
-        return f"<Turn{self.config} {self.perspective.short_str}:{self.player.short_str} {self.roll} {home or '-'} [{board}] {goal or '-'}>"
+        return f"Board{self.config}({self.perspective.short_str}: {home or '-'} [{board}] {goal or '-'})"
     
     @property
     def swapped(self):
         """
-        Return the same game, but from the other player's perspective. This allows most logic to
-        only be written for one player.
+        Return the same game, but from the other player's perspective. This allows most logic to only be written for one
+        player.
 
-        >>> print(Turn(perspective=Player.BLACK, player=Player.BLACK, roll=3, board=('BW', '-B--W-', 'BW')).swapped)
-        <Turn{6,3,6} W:B 3 BW [-W--B-] BW>
+        >>> print(Board(perspective=Player.BLACK, board=('BW', '-B--W-', 'BW')).swapped)
+        Board{6,3,6}(W: BW [-W--B-] BW)
         """
-        return Turn(perspective=self.perspective.swapped, player=self.player, roll=self.roll,
-            checkers=swap_checkers(self.checkers, self.config), config=self.config, dicestream=self.dicestream)
+        return Board(
+            perspective=self.perspective.swapped,
+            checkers=swap_checkers(self.checkers, self.config),
+            config=self.config
+        )
+    
+    def is_winner(self, player: Player = None) -> bool:
+        if player is None:
+            player = self.perspective
+        
+        return all(
+            checker.position == Checker.Position('GOAL') for checker in self.checkers if checker.player == player
+        )
     
     @property
-    def is_winner(self) -> bool:
-        return all([
-            checker.position == Checker.Position('GOAL') for checker in self.checkers if
-            checker.player == self.perspective
-        ])
-    
-    @property
-    def whowon(self) -> Optional[Literal[-1, 1]]:
+    def whowon(self) -> Optional[Player]:
         """
-        Return the winner (1 if it's us, -1 if it's not), or None if there is no winner.
+        Return the winner, or None if there is no winner.
 
         A player wins when they've gotten all their checkers off the board.
 
-        >>> Turn(perspective=Player.BLACK, roll=3, board=('', '-----W', 'BBBWW')).whowon
-        1
-        >>> Turn(perspective=Player.BLACK, roll=3, board=('', '-----B', 'BBWWW')).whowon
-        -1
-        >>> Turn(perspective=Player.BLACK, roll=3, board=('', '----WB', 'BBWW')).whowon is None
-        True
-        >>> Turn(perspective=Player.WHITE, roll=3, board=('', '-----W', 'BBBWW')).whowon
-        -1
-        >>> Turn(perspective=Player.WHITE, roll=3, board=('', '-----B', 'BBWWW')).whowon
-        1
-        >>> Turn(perspective=Player.WHITE, roll=3, board=('', '----WB', 'BBWW')).whowon is None
+        >>> Board(perspective=Player.BLACK, board=('', '-----W', 'BBBWW')).whowon
+        Player.BLACK
+        >>> Board(perspective=Player.BLACK, board=('', '-----B', 'BBWWW')).whowon
+        Player.WHITE
+        >>> Board(perspective=Player.WHITE, board=('', '-----B', 'BBWWW')).whowon
+        Player.WHITE
+        >>> Board(perspective=Player.BLACK, board=('', '----WB', 'BBWW')).whowon is None
         True
         """
-        if self.is_winner:
-            return 1
-        elif self.swapped.is_winner:
-            return -1
+        if self.is_winner(Player.BLACK):
+            return Player.BLACK
+        elif self.is_winner(Player.WHITE):
+            return Player.WHITE
         else:
             return None
     
-    def is_open(self, position: Checker.Position) -> bool:
+    def is_open(self, position: Checker.Position, player: Player = None) -> bool:
         """
         Check if the perspective's player _could_ move a checker to the given position, if they had a suitable roll.
         
@@ -393,6 +361,8 @@ class Turn:
 
         _Tested via open_positions._
         """
+        if player is None:
+            player = self.perspective
         
         if position == Checker.Position('GOAL'):  # The goal is always open
             return True
@@ -403,41 +373,41 @@ class Turn:
             if len(checkers_on_spot) == 0:
                 return True
             # Definitely not free if we already have a checker there
-            elif checkers_on_spot[0].player == self.player:
+            elif checkers_on_spot[0].player == player:
                 return False
             # Otherwise, it's an opponent's checker so let's see if we can take it
             else:
                 # Check for primes (two opponent pieces next to each other are protected)
                 if position > 0:
                     maybe_protector = only(checker for checker in self.checkers if checker.position == position - 1)
-                    if maybe_protector is not None and maybe_protector.player == self.player.swapped:
+                    if maybe_protector is not None and maybe_protector.player == player.swapped:
                         return False
                 if position + 1 < self.config.board_size:
                     maybe_protector = only(checker for checker in self.checkers if checker.position == position + 1)
-                    if maybe_protector is not None and maybe_protector.player == self.player.swapped:
+                    if maybe_protector is not None and maybe_protector.player == player.swapped:
                         return False
         return True
     
     @property
-    def open_positions(self) -> Iterator[Checker.Position]:
+    def open_positions(self, player: Player = None) -> Iterator[Checker.Position]:
         """
-        Return all the positions that  the perspective's player _could_ move a checker to, if they had a suitable roll.
+        Return all the positions that the player (or the perspective's player) could move to, if they had the right roll.
 
         NOTE: This method does not take into account if the player has the checker to move, nor if it's their turn.
 
-        >>> ", ".join(sorted([p.name for p in Turn(perspective=Player.BLACK, player=Player.BLACK, roll=3, board=('BBBWWW', '------', '')).open_positions]))
+        >>> ", ".join(sorted([p.name for p in Board(perspective=Player.BLACK, board=('BBBWWW', '------', '')).open_positions]))
         '0, 1, 2, 3, 4, 5, GOAL'
-        >>> ", ".join(sorted([p.name for p in Turn(perspective=Player.BLACK, player=Player.BLACK, roll=3, board=('BWWW',   '-B---B', '')).open_positions]))
+        >>> ", ".join(sorted([p.name for p in Board(perspective=Player.BLACK, board=('BWWW',   '-B---B', '')).open_positions]))
         '0, 2, 3, 4, GOAL'
-        >>> ", ".join(sorted([p.name for p in Turn(perspective=Player.BLACK, player=Player.BLACK, roll=3, board=('BBB',    '--WW-W', '')).open_positions]))
+        >>> ", ".join(sorted([p.name for p in Board(perspective=Player.BLACK, board=('BBB',    '--WW-W', '')).open_positions]))
         '0, 1, 4, 5, GOAL'
 
         And for white:
-        >>> ", ".join(sorted([p.name for p in Turn(perspective=Player.WHITE, player=Player.WHITE, roll=3, board=('BWW',    'BB---W', '')).open_positions]))
+        >>> ", ".join(sorted([p.name for p in Board(perspective=Player.WHITE, board=('BWW',    'BB---W', '')).open_positions]))
         '2, 3, 4, GOAL'
-        >>> ", ".join(sorted([p.name for p in Turn(perspective=Player.WHITE, player=Player.WHITE, roll=3, board=('WB',     'WW--BB', '')).open_positions]))
+        >>> ", ".join(sorted([p.name for p in Board(perspective=Player.WHITE, board=('WB',     'WW--BB', '')).open_positions]))
         '2, 3, GOAL'
-        >>> ", ".join(sorted([p.name for p in Turn(perspective=Player.WHITE, player=Player.WHITE, roll=3, board=('B',      'WBW-WB', '')).open_positions]))
+        >>> ", ".join(sorted([p.name for p in Board(perspective=Player.WHITE, board=('B',      'WBW-WB', '')).open_positions]))
         '1, 3, 5, GOAL'
         """
         # The goal is always open
@@ -446,29 +416,26 @@ class Turn:
         # Check all the other spots
         for i in range(0, self.config.board_size):
             position = Checker.Position(i)
-            if self.is_open(position):
+            if self.is_open(position, player):
                 yield position
-    
-    @property
-    def legal_moves(self) -> Iterator[Move]:
+
+    def legal_moves(self, roll: int, player: Player = None) -> Iterator[Move]:
         """
-        Returns all legal moves for the current player from the current state.
-        
-        NOTE: This method can only be called when the perspective player is the same as the current player.
-        
-        >>> print_each(Turn(perspective=Player.BLACK, roll=3, board=('BBBWWW', '------', '')).legal_moves)
+        Returns all legal moves for the player (or the perspective player) from the current state.
+
+        >>> print_each(Board(('BBBWWW', '------', ''), perspective=Player.BLACK).legal_moves(3))
         Move(B: HOME -> 2)
-        >>> print_each(Turn(perspective=Player.BLACK, roll=1, board=('', 'BWWBWB', '')).legal_moves)
+        >>> print_each(Board(('', 'BWWBWB', ''), perspective=Player.BLACK).legal_moves(1))
         Move(B: 3 -> 4)
         Move(B: 5 -> GOAL)
-        >>> print_each(Turn(perspective=Player.WHITE, player=Player.WHITE, roll=1, board=('', 'BWWBWB', '')).legal_moves)
+        >>> print_each(Board(('', 'BWWBWB', ''), perspective=Player.WHITE).legal_moves(1, Player.WHITE))
         Move(W: 2 -> 3)
         Move(W: 4 -> 5)
-        >>> print_each(Turn(perspective=Player.WHITE, player=Player.WHITE, roll=3, board=('WBBB', 'W---W-', '')).legal_moves)
+        >>> print_each(Board(('WBBB', 'W---W-', ''), perspective=Player.WHITE).legal_moves(3))
         Move(W: 0 -> 3)
         Move(W: 4 -> GOAL)
         Move(W: HOME -> 2)
-        >>> print_each(Turn(perspective=Player.WHITE, player=Player.WHITE, rolls=[1, 1], board=('', 'BWWBWB', '')).legal_moves)
+        >>> print_each(Board(('', 'BWWBWB', ''), perspective=Player.WHITE).legal_moves(1))
         Move(W: 2 -> 3)
         Move(W: 4 -> 5)
         """
@@ -482,34 +449,98 @@ class Turn:
         # roll their dice, and the winner gets the difference between the rolls (in case of tie, roll again). A checker
         # cannot legally land on another checker of the same color, nor on any of the opponent which are protected by an
         # adjacent checker on the board. Landing on a singleton opponent checker hits it back off the board.
-        assert self.player == self.perspective, "only the current player has legal moves!"
         
+        if player is None:
+            player = self.perspective
+    
         # All checkers at home are equivalent, so we want to only generate moves for one of them
         had_checker_at_home = False
-        
+    
         for checker in self.checkers:
             # We can't move our opponent's checkers
-            if checker.player != self.perspective:
+            if checker.player != player:
                 continue
-            
+        
             # A checker in the goal never moves
             if checker.position == Checker.Position('GOAL'):
                 continue
-            
+        
             if checker.position == Checker.Position('HOME'):
                 if had_checker_at_home:
                     continue
                 had_checker_at_home = True
-            
-            to_idx = self.roll + checker.position
-            
+        
+            to_idx = roll + checker.position
+        
             if to_idx < self.config.board_size:
                 to_pos = Checker.Position(to_idx)
             else:
                 to_pos = Checker.Position('GOAL')
-            
+        
             if self.is_open(to_pos):
                 yield Move(self, checker, to_pos)
+
+
+class Turn:
+    """
+    A dataclass representing a turn of the game. Completely immutable.
+
+    Any given turn can be seen from either player's perspective, irrespective of if it is that
+    player's turn.
+    """
+    board: Board
+    """ The current board. """
+    
+    player: Player
+    """ Who's turn is it? """
+    
+    dicestream: Dicestream
+    """
+    The dicestream we're using. Importantly, this is only touched once at creation time when this
+    turn's roll is calculated.
+    """
+    
+    def __init__(self, board: Board, player: Player = Player.BLACK,
+        dicestream: Dicestream = None, seed: int = None, rolls: List[int] = None):
+        """
+        >>> print(Turn(Board(('BW', 'B----W', 'WB')), seed=1))
+        <Turn(B): Board{6,3,6}(B: BW [B----W] BW)>
+        >>> print(Turn(Board(('', 'BWBWBW', '')), seed=1))
+        <Turn(B): Board{6,3,6}(B: - [BWBWBW] -)>
+        >>> print(Turn(Board(('', 'BWB--WBW', ''), config=GameConfiguration(8, 3, 6)), seed=1))
+        <Turn(B): Board{8,3,6}(B: - [BWB--WBW] -)>
+        """
+        if dicestream is None:
+            if rolls is not None:
+                dicestream = Dicestream.fixed(rolls)
+                assert seed is None, "seed cannot be provided if rolls is provided"
+            else:
+                dicestream = Dicestream.random(board.config.die_size, seed)
+        else:
+            assert seed is None, "seed cannot be provided if dicestream is provided"
+            assert rolls is None, "rolls cannot be provided if dicestream is provided"
+        
+        # Sanity Checks
+        assert dicestream.die_size == board.config.die_size, "dicestream's die size must match game config's die_size!"
+        # FIXME: assert config.die_size >= abs(roll) >= 1, "roll must be in range [1, die_size]"
+        assert \
+            is_unique(checker.position for checker in board.checkers if checker.position.is_concrete), \
+            "two checkers on the same spot!"
+        
+        if board.perspective != player:
+            board = board.swapped
+
+        self.board = board
+        self.player = player
+        self.dicestream = dicestream
+        
+    def __str__(self):
+        return f"<Turn({self.player.short_str}): {str(self.board)}>"
+    
+    @property
+    def is_winner(self) -> bool:
+        return self.board.is_winner(self.player)
+    
 
 
 def start_game(dicestream: Dicestream = None, rolls: List[int] = None, seed: int = None,
@@ -518,15 +549,15 @@ def start_game(dicestream: Dicestream = None, rolls: List[int] = None, seed: int
     Create a starting game state.
 
     >>> print(start_game(rolls=[1, 2, 3]))
-    <Turn{6,3,6} B:W 1 BW [BB--WW] ->
+    <Turn(W): Board{6,3,6}(W: BW [WW--BB] -)>
     >>> print(start_game(rolls=[1, 2, 3], config=GameConfiguration(6, 3, 6)))
-    <Turn{6,3,6} B:W 1 BW [BB--WW] ->
+    <Turn(W): Board{6,3,6}(W: BW [WW--BB] -)>
     >>> print(start_game(seed=1, config=GameConfiguration(7, 4, 6)))
-    <Turn{7,4,6} B:W 3 BBWW [BB---WW] ->
+    <Turn(W): Board{7,4,6}(W: BBWW [WW---BB] -)>
     >>> print(start_game(Dicestream.fixed([1, 2]), perspective=Player.WHITE, config=GameConfiguration(8, 3, 6)))
-    <Turn{8,3,6} W:W 1 BW [BB----WW] ->
+    <Turn(W): Board{8,3,6}(W: BW [BB----WW] -)>
     >>> print(start_game(Dicestream.fixed([1, 2]), perspective=Player.WHITE, config=GameConfiguration(8, 4, 6)))
-    <Turn{8,4,6} W:W 1 BW [BBB--WWW] ->
+    <Turn(W): Board{8,4,6}(W: BW [BBB--WWW] -)>
     """
     if dicestream is None:
         if rolls is not None:
@@ -552,9 +583,8 @@ def start_game(dicestream: Dicestream = None, rolls: List[int] = None, seed: int
     # Black's home is always on the left
     board = ('B' * checkers_start_on_board) + ('-' * blank_spaces) + ('W' * checkers_start_on_board)
     
-    initial_state = Turn(board=('BW' * checkers_at_home, board, ''), roll=starting_roll, player=starting_player,
-                         perspective=perspective,
-                         config=config, dicestream=dicestream)
+    initial_state = Turn(board=Board(('BW' * checkers_at_home, board, ''), config=config, perspective=perspective),
+                        player=starting_player, dicestream=dicestream)
     
     return initial_state
 
