@@ -1,9 +1,11 @@
-from dataclasses import dataclass
 from typing import *
+from dataclasses import dataclass
+from functools import total_ordering
 
 from Player import Player
 
 @dataclass
+@total_ordering
 class Checker:
     """
     An immutable data class representing a Checker.
@@ -88,11 +90,17 @@ class Checker:
     def __str__(self):
         return f"Checker({self.player.short_str} @ {self.position.name})"
     
-    def __eq__(self, other):
+    def __eq__(self, other: 'Checker'):
         return self.player == other.player and self.position == other.position
     
-    def __ne__(self, other):
-        return not (self == other)
+    def __hash__(self):
+        return hash((self.player, self.position))
+    
+    def __lt__(self, other: 'Checker'):
+        if self.position != other.position:
+            return self.position < other.position
+        else:
+            return self.player == Player.BLACK
     
     @property
     def display_symbol(self) -> str:

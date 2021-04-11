@@ -146,6 +146,10 @@ class Move:
     
     def __str__(self):
         return f"Move({self.checker.player.short_str}: {self.checker.position.name} -> {self.to.name})"
+    
+    @property
+    def player(self) -> Player:
+        return self.checker.player
 
     @classmethod
     def create(cls, from_idx: Checker.Position.Value, to_idx: Checker.Position.Value, board: 'Board'):
@@ -157,26 +161,33 @@ class Move:
         checker = only(checker for checker in board.checkers if checker.position == from_idx)
         return Move(board, checker, to_idx)
 
-    def make(self) -> 'Board':
+    @property
+    def executed(self) -> 'Board':
         """
-        Execute this move and return a new Turn.
+        Return the resulting board after this move has been executed.
         
-        >>> print(Move.create(3, 4, Board(perspective=Player.BLACK, board=('', 'BWWBWB', ''))).make())
+        >>> print(Move.create(3, 4, Board(perspective=Player.BLACK, board=('', 'BWWBWB', ''))).executed)
         Board{6,3,6}(B: W [BWW-BB] -)
-        >>> print(Move.create(5, 'GOAL', Board(perspective=Player.WHITE, board=('', 'BWWBWB', ''))).make())
+        >>> print(Move.create(5, 'GOAL', Board(perspective=Player.WHITE, board=('', 'BWWBWB', ''))).executed)
         Board{6,3,6}(W: - [BWWBW-] B)
         """
         # Remove the checker that needs to be moved, and handle any captures
-        checkers = [
-            Checker(checker.player, Checker.Position('HOME')) if checker.position == self.to else checker
-            for checker in self.board.checkers
-            if checker != self.checker
-        ]
+        new_checkers = []
+        has_removed_target = False
+        for checker in self.board.checkers:
+            # Remove the checker to be moved, and we'll add it back later
+            if checker == self.checker and not has_removed_target:
+                has_removed_target = True
+                continue
+            elif checker.position == self.to:
+                new_checkers += [Checker(checker.player, Checker.Position('HOME'))]
+            else:
+                new_checkers += [checker]
         
         # Add the newly-moved checker
-        checkers += [Checker(self.checker.player, self.to)]
+        new_checkers += [Checker(self.checker.player, self.to)]
         
-        return Board(perspective=self.board.perspective, checkers=checkers, config=self.board.config)
+        return Board(perspective=self.board.perspective, checkers=new_checkers, config=self.board.config)
 
 
 class Board:
@@ -213,14 +224,14 @@ class Board:
                 board = BoardDescription(board[0], board[1], board[2])
             checkers = board.checkers
 
-        assert len(checkers) == config.checkers_per_player * 2, "incorrect number of checkers!"
+        assert len(checkers) == config.checkers_per_player * 2, f"incorrect number of checkers! (Expected {config.checkers_per_player * 2}, Got {len(checkers)})"
         
         # Sanity Checks
         assert is_unique([checker.position for checker in checkers if checker.position.is_concrete]), \
             "two checkers on the same spot!"
         
         self.perspective = perspective
-        self.checkers = checkers
+        self.checkers = sorted(checkers)
         self.config = config
     
     def print(self):
@@ -306,6 +317,12 @@ class Board:
         home, board, goal = BoardDescription.from_checkers(self.checkers, config=self.config)
         
         return f"Board{self.config}({self.perspective.short_str}: {home or '-'} [{board}] {goal or '-'})"
+    
+    def __eq__(self, other: 'Board'):
+        return self.perspective == other.perspective and self.config == other.config and self.checkers == other.checkers
+    
+    def __hash__(self):
+        return hash((self.perspective, self.config, tuple(self.checkers)))
     
     @property
     def swapped(self):
@@ -479,6 +496,42 @@ class Board:
         
             if self.is_open(to_pos):
                 yield Move(self, checker, to_pos)
+    
+    @classmethod
+    def create_starting_board(cls, config: GameConfiguration = GameConfiguration(), perspective: Player = Player.BLACK):
+        """
+        Create a starting board for config.
+
+        >>> print(Board.create_starting_board())
+        Board{6,3,6}(B: BW [BB--WW] -)
+        >>> print(Board.create_starting_board(GameConfiguration(6, 3, 6)))
+        Board{6,3,6}(B: BW [BB--WW] -)
+        >>> print(Board.create_starting_board(GameConfiguration(7, 4, 6)))
+        Board{7,4,6}(B: BBWW [BB---WW] -)
+        >>> print(Board.create_starting_board(GameConfiguration(8, 3, 6), Player.WHITE))
+        Board{8,3,6}(W: BW [WW----BB] -)
+        >>> print(Board.create_starting_board(GameConfiguration(8, 4, 6), Player.WHITE))
+        Board{8,4,6}(W: BW [WWW--BBB] -)
+        """
+        # TODO: the spec is unclear as to the starting configuration for size > 6
+        checkers_start_on_board = min(config.checkers_per_player - 1, (config.board_size // 2) - 1)
+        checkers_at_home = config.checkers_per_player - checkers_start_on_board
+        
+        checkers = [
+                       Checker(perspective, Checker.Position('HOME')),
+                       Checker(perspective.swapped, Checker.Position('HOME'))
+                   ] * checkers_at_home
+        
+        for i in range(0, checkers_start_on_board):
+            checkers += [
+                Checker(perspective, Checker.Position(i)),
+                Checker(perspective.swapped, Checker.Position(config.board_size - 1 - i))
+            ]
+            
+        # Sanity Check
+        assert len(checkers) == 2 * config.checkers_per_player, "wrong number of checkers!"
+        
+        return cls(checkers=checkers, perspective=perspective, config=config)
 
 
 class Turn:
@@ -537,10 +590,24 @@ class Turn:
     def __str__(self):
         return f"<Turn({self.player.short_str}): {str(self.board)}>"
     
+    def __eq__(self, other: 'Turn'):
+        # FIXME: Ignores dicestream
+        return self.board == other.board and self.player == other.player
+    
+    def __hash__(self):
+        return hash((self.board, self.player))
+    
     @property
     def is_winner(self) -> bool:
         return self.board.is_winner(self.player)
     
+    def make(self, move: Move) -> 'Turn':
+        """
+        Make a move and return the resulting turn.
+        """
+        assert move.board == self.board, "cannot make a move not for this board!"
+        assert move.player == self.player, "cannot make a move out of turn!"
+        return Turn(move.executed, player=self.player.swapped, dicestream=self.dicestream)
 
 
 def start_game(dicestream: Dicestream = None, rolls: List[int] = None, seed: int = None,
