@@ -1,16 +1,19 @@
 from typing import *
 
+from helpers import *
 from main import Turn, Board, GameConfiguration
 from Player import Player
 
 
 def explore(config: GameConfiguration = GameConfiguration()):
     """
-    >>> explore()
+    Return all possible turns for a game of Nannon.
+    
+    No tests because they're too slow.
     """
     children = {}
     to_explore = []  # type: List[Turn]
-    possible_states = []  # type: List[Turn]
+    all_turns = []  # type: List[Turn]
 
     # We need to special case the first roll, which is where both players roll a die and the player who rolled the
     # highest gets the difference (in a tie, they re-roll). We represent this by creating two root states: one where
@@ -24,7 +27,7 @@ def explore(config: GameConfiguration = GameConfiguration()):
         # has to roll at least 1).
         for roll in range(1, config.board_size):
             children[turn] += [turn.make(move) for move in turn.board.legal_moves(roll)]
-        possible_states += [turn]
+        all_turns += [turn]
         to_explore += children[turn]
     
     for turn in to_explore:
@@ -32,7 +35,7 @@ def explore(config: GameConfiguration = GameConfiguration()):
             children[turn] = []
             for roll in range(1, config.die_size + 1):
                 children[turn] += [turn.make(move) for move in turn.board.legal_moves(roll)]
-            possible_states += [turn]
+            all_turns += [turn]
             to_explore += children[turn]
     
-    return possible_states
+    return all_turns

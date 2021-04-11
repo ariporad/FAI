@@ -1,5 +1,7 @@
 from typing import *
 
+from time import perf_counter
+
 T = TypeVar('T')
 
 
@@ -22,3 +24,15 @@ def only(iterable: Iterable[T], message: Union[str, Exception] = "list expected 
     lst = list(iterable)
     assert len(lst) <= 1, message
     return lst[0] if len(lst) == 1 else None
+
+
+def time(f):
+    """
+    Time the number of seconds it takes to run f.
+    Returns a tuple: (time, f())
+    """
+    start = perf_counter()
+    ret = f()
+    end = perf_counter()
+    return end - start, ret
+    
