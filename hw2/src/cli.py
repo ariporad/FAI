@@ -27,6 +27,7 @@ def main():
     from play_game import play_game
     from play_tournament import play_tournament
     from bulk_tournament import bulk_tournament
+    from roundrobin import roundrobin
     from main import GameConfiguration
     parser = argparse.ArgumentParser()
 
@@ -54,7 +55,7 @@ def main():
         else:
             bulk_tournament(players, rounds=args.rounds, seed=args.seed, config=config)
     elif args.mode in ['r', 'roundrobin']:
-        raise NotImplementedError("TODO: Round Robin")
+        roundrobin(players, seed=args.seed, config=config)
 
 
 if __name__ == '__main__':

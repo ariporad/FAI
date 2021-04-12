@@ -18,7 +18,8 @@ class PlayerAlgorithm:
         Uses the magic of Python to detect all PlayerAlgorithm subclasses that have been defined without any other
         tracking.
         """
-        return all_subclasses(cls)
+        # We sort here to ensure consistency, which makes some other things simpler
+        return sorted(all_subclasses(cls), key=lambda c: c.name)
 
     @classmethod
     def get(cls, name: str, *args, **kwargs) -> 'PlayerAlgorithm':
