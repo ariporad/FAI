@@ -375,7 +375,7 @@ class Board:
         return all(
             checker.position == Checker.Position('GOAL') for checker in self.checkers if checker.player == player
         )
-    
+
     @property
     def whowon(self) -> Optional[Player]:
         """
@@ -529,7 +529,33 @@ class Board:
                 moves += [Move(self, checker, to_pos)]
         
         return moves
-    
+
+    def score(self, player: Player = None):
+        """
+        Return player's score, which is the sum of the position of all the checkers (where home is 0pts, the board is
+        1...board_size pts, and the goal is board_size + 1 pts).
+        """
+        if player is None:
+            player = self.perspective
+
+        if player != self.perspective:
+            return self.swapped.score(player)
+
+        total = 0
+        for checker in self.checkers:
+            if checker.player != player:
+                continue
+
+            if checker.position == Checker.Position('HOME'):
+                # Home is 0 points
+                continue
+            elif checker.position == Checker.Position('GOAL'):
+                total += self.config.board_size + 1
+            else:
+                total += checker.position + 1
+
+        return total
+
     @classmethod
     def create_starting_board(cls, config: GameConfiguration = GameConfiguration(), perspective: Player = Player.BLACK):
         """

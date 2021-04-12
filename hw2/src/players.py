@@ -4,28 +4,60 @@ from random import choice
 from helpers import *
 from main import Move, Player
 
+
 class PlayerAlgorithm:
+    """
+    An abstract class representing one algorithm for playing Nannon.
+    """
+
     @classmethod
     def all(cls):
+        """
+        Return all available Nannon PlayerAlgorithms.
+
+        Uses the magic of Python to detect all PlayerAlgorithm subclasses that have been defined without any other
+        tracking.
+        """
         return all_subclasses(cls)
 
     @classmethod
     def get(cls, name: str, *args, **kwargs) -> 'PlayerAlgorithm':
+        """
+        Get an instance of the PlayerAlgorithm called "name".
+
+        NOTE: This returns an instance, not the class.
+        NOTE: name refers to the instance's .name property.
+
+        Uses the magic of Python to detect all PlayerAlgorithm subclasses that have been defined without any other
+        tracking.
+        """
         AlgClass = only((c for c in cls.all() if c.name == name), "couldn't find PlayerAlgorithm!")
         return AlgClass(*args, **kwargs)
+
+    def play(self, moves: List[Move], roll: int) -> Move:
+        """
+        Pick which move to play.
+
+        For a shortcut to implementing this for many use cases, see rank().
+        """
+        return sorted(moves, key=lambda m: self.rank(m), reverse=True)[0]
+
+    def rank(self, move: Move) -> int:
+        """
+        Many algorithms simply calculate a numerical value for each move and pick the move with the highest (or lowest)
+        value. For those, they can simply implement rank(move), and PlayerAlgorithm will provide a play implementation.
+
+        For the default implementation, PlayerAlgorithm will pick the move with the value closest to positive infinity.
+        If an implementation wants to instead pick the lowest value, simply multiply the values by -1.
+        """
+        raise NotImplementedError("Abstract method: do not use PlayerAlgorithm directly!")
 
     @property
     def name(self) -> str:
         """
         Return the human-readable name of this play algorithm.
         """
-        raise NotImplementedError("Do not use PlayerAlgorithm directly!")
-
-    def play(self, moves: List[Move], roll: int) -> Move:
-        """
-        Pick which move to play.
-        """
-        raise NotImplementedError("Do not use PlayerAlgorithm directly!")
+        raise NotImplementedError("Abstract method: do not use PlayerAlgorithm directly!")
 
     @property
     def force_silent(self) -> bool:
@@ -72,8 +104,8 @@ class FirstPlayerAlgorithm(PlayerAlgorithm):
     """
     name = "first"
 
-    def play(self, moves: List[Move], roll: int) -> Move:
-        return sorted(moves, key=lambda m: m.checker.position, reverse=True)[0]
+    def rank(self, move: Move) -> int:
+        return move.checker.position
 
 
 class LastPlayerAlgorithm(PlayerAlgorithm):
@@ -83,5 +115,17 @@ class LastPlayerAlgorithm(PlayerAlgorithm):
     """
     name = "last"
 
-    def play(self, moves: List[Move], roll: int) -> Move:
-        return sorted(moves, key=lambda m: m.checker.position, reverse=False)[0]
+    def rank(self, move: Move) -> int:
+        return -move.checker.position
+
+
+class ScorePlayerAlgorithm(PlayerAlgorithm):
+    """
+    A Nannon player that tries to maximize the difference between a player's scores.
+    """
+    name = "score"
+
+    def rank(self, move: Move) -> int:
+        player = move.player
+        return move.executed.score(player) - move.executed.score(player.swapped)
+
