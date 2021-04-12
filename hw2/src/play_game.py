@@ -29,12 +29,14 @@ def play_game(black_player: PlayerAlgorithm, white_player: PlayerAlgorithm,
         starting_player = Player.WHITE
         
     turn = Turn(Board.create_starting_board(config, starting_player), player=starting_player, dicestream=dicestream)
-    
+
+    is_first_turn = True
     while turn.board.whowon is None:
-        roll = dicestream.roll() # FIXME: didn't take first roll into account!
+        roll = starting_roll if is_first_turn else dicestream.roll()
         player = black_player if turn.player == Player.BLACK else white_player
         assert turn.board.perspective == turn.player
         legal_moves = turn.board.legal_moves(roll)
+        is_first_turn = False
 
         if len(legal_moves) == 0:
             if not silent:
@@ -49,7 +51,7 @@ def play_game(black_player: PlayerAlgorithm, white_player: PlayerAlgorithm,
             print(move.draw(Player.BLACK))
 
         turn = turn.make(move)
-    
+
     if not silent:
         print(f"Winner: {turn.board.whowon.long_str} ({(black_player if turn.board.whowon == Player.BLACK else white_player).name})! ")
     
