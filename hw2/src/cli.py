@@ -24,15 +24,15 @@ def main():
     import argparse
 
     from players import PlayerAlgorithm
-    from Dicestream import Dicestream
     from play_game import play_game
     from play_tournament import play_tournament
+    from bulk_tournament import bulk_tournament
     from main import GameConfiguration
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("player1", choices=[a.name for a in PlayerAlgorithm.all()], help="player 1 algorithm")
-    parser.add_argument("player2", choices=[a.name for a in PlayerAlgorithm.all()], help="player 2 algorithm")
-    parser.add_argument("-n", "--n-pairs", help="number of matches to run", type=int, default=0)
+    parser.add_argument("mode", choices=['g', 'game', 't', 'tournament', 'r', 'roundrobin'], help="game mode")
+    parser.add_argument("players", choices=[a.name for a in PlayerAlgorithm.all()],  nargs='+', help="player algorithms (2 for game our tournament, 2+ for round robin)")
+    parser.add_argument("-n", "--n-pairs", help="number of matches to run", type=int, default=50)
     parser.add_argument('-b', '--board-size', help="board size", type=int, default=6)
     parser.add_argument('-c', '--checkers', help="checkers per player", type=int, default=3)
     parser.add_argument('-d', '--die-size', help='die size', type=int, default=6)
@@ -40,15 +40,21 @@ def main():
 
     args = parser.parse_args()
 
-    player1 = PlayerAlgorithm.get(args.player1.lower().strip())
-    player2 = PlayerAlgorithm.get(args.player2.lower().strip())
+    players = [PlayerAlgorithm.get(name.lower().strip()) for name in args.players]
+
+    assert len(players) >= 2, "must provide at least two players!"
 
     config = GameConfiguration(args.board_size, args.checkers, args.die_size)
 
-    if args.n_pairs == 0:
-        play_game(player1, player2, seed=args.seed, config=config)
-    else:
-        play_tournament(player1, player2, args.n_pairs, args.seed, config)
+    if args.mode in ['g', 'game']:
+        play_game(players[0], players[1], seed=args.seed, config=config)
+    elif args.mode in ['t', 'tournament']:
+        if len(players) == 2:
+            play_tournament(players[0], players[1], args.n_pairs, args.seed, config)
+        else:
+            bulk_tournament(players, n_pairs=args.n_pairs, seed=args.seed, config=config)
+    elif args.mode in ['r', 'roundrobin']:
+        raise NotImplementedError("TODO: Round Robin")
 
 
 if __name__ == '__main__':
