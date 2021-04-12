@@ -32,7 +32,7 @@ def main():
 
     parser.add_argument("mode", choices=['g', 'game', 't', 'tournament', 'r', 'roundrobin'], help="game mode")
     parser.add_argument("players", choices=[a.name for a in PlayerAlgorithm.all()],  nargs='+', help="player algorithms (2 for game our tournament, 2+ for round robin)")
-    parser.add_argument("-n", "--n-pairs", help="number of matches to run", type=int, default=50)
+    parser.add_argument("-n", "--rounds", help="number of matches to run", type=int, default=100)
     parser.add_argument('-b', '--board-size', help="board size", type=int, default=6)
     parser.add_argument('-c', '--checkers', help="checkers per player", type=int, default=3)
     parser.add_argument('-d', '--die-size', help='die size', type=int, default=6)
@@ -50,9 +50,9 @@ def main():
         play_game(players[0], players[1], seed=args.seed, config=config)
     elif args.mode in ['t', 'tournament']:
         if len(players) == 2:
-            play_tournament(players[0], players[1], args.n_pairs, args.seed, config)
+            play_tournament(players[0], players[1], rounds=args.rounds, seed=args.seed, config=config)
         else:
-            bulk_tournament(players, n_pairs=args.n_pairs, seed=args.seed, config=config)
+            bulk_tournament(players, rounds=args.rounds, seed=args.seed, config=config)
     elif args.mode in ['r', 'roundrobin']:
         raise NotImplementedError("TODO: Round Robin")
 
