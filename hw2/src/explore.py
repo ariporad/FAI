@@ -25,7 +25,7 @@ def explore(config: GameConfiguration = GameConfiguration()):
         children[turn] = []
         # For the first roll, the highest you can roll is die_size - 1 (because it's the difference and the other player
         # has to roll at least 1).
-        for roll in range(1, config.board_size):
+        for roll in range(1, config.die_size):
             children[turn] += [turn.make(move) for move in turn.board.legal_moves(roll)]
         all_turns += [turn]
         to_explore += children[turn]
