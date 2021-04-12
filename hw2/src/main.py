@@ -161,6 +161,12 @@ class Move:
         checker = only(checker for checker in board.checkers if checker.position == from_idx)
         return Move(board, checker, to_idx)
 
+    def draw(self, perspective: Player = None) -> str:
+        board = self.executed
+        if perspective is not None:
+            board = board.from_perspective(perspective)
+        return board.draw([self.checker])
+
     @property
     def executed(self) -> 'Board':
         """
@@ -170,6 +176,8 @@ class Move:
         Board{6,3,6}(B: W [BWW-BB] -)
         >>> print(Move.create(5, 'GOAL', Board(perspective=Player.WHITE, board=('', 'BWWBWB', ''))).executed)
         Board{6,3,6}(W: - [BWWBW-] B)
+        >>> print(Move.create(4, 'GOAL', Board(perspective=Player.WHITE, board=('', 'BWWBW-', 'B'))).executed)
+        Board{6,3,6}(W: - [BWWB--] BW)
         """
         # Remove the checker that needs to be moved, and handle any captures
         new_checkers = []
@@ -179,7 +187,7 @@ class Move:
             if checker == self.checker and not has_removed_target:
                 has_removed_target = True
                 continue
-            elif checker.position == self.to:
+            elif self.to.is_concrete and checker.position == self.to:
                 new_checkers += [Checker(checker.player, Checker.Position('HOME'))]
             else:
                 new_checkers += [checker]
@@ -234,69 +242,80 @@ class Board:
         self.checkers = sorted(checkers)
         self.config = config
     
-    def print(self):
+    def draw(self, ghost_checkers: List[Checker] = []) -> str:
         """
-        Print a human-readable view of the board.
+        Return a string with a human-readable view of the board.
+        
+        If ghost_checkers is provided, those checkers will be rendered greyed-out.
 
-        >>> Board(perspective=Player.BLACK, board=('BBBWWW', '-B--W-', 'BW'), config=GameConfiguration(6, 5, 6)).print()
+        >>> print(Board(perspective=Player.BLACK, board=('BBBWWW', '-B--W-', 'BW'), config=GameConfiguration(6, 5, 6)).draw())
                      Black →
         Goal → ●     |  ▼  ▼  ▼  ▼  ▼  ▼  |     ○ ← Goal
                      |     ○        ●     |
         Home → ○○○   |  ▲  ▲  ▲  ▲  ▲  ▲  |   ●●● ← Home
                                     ← White
-        >>> Board(perspective=Player.BLACK, board=('BBBBBWWWWW', '------', ''), config=GameConfiguration(6, 5, 6)).print()
+        >>> print(Board(perspective=Player.BLACK, board=('BBBBBWWWWW', '------', ''), config=GameConfiguration(6, 5, 6)).draw())
                      Black →
         Goal →       |  ▼  ▼  ▼  ▼  ▼  ▼  |       ← Goal
                      |                    |
         Home → ○○○○○ |  ▲  ▲  ▲  ▲  ▲  ▲  | ●●●●● ← Home
                                     ← White
-        >>> Board(perspective=Player.BLACK, board=('', '------', 'BBBBBWWWWW'), config=GameConfiguration(6, 5, 6)).print()
+        >>> print(Board(perspective=Player.BLACK, board=('', '------', 'BBBBBWWWWW'), config=GameConfiguration(6, 5, 6)).draw())
                      Black →
         Goal → ●●●●● |  ▼  ▼  ▼  ▼  ▼  ▼  | ○○○○○ ← Goal
                      |                    |
         Home →       |  ▲  ▲  ▲  ▲  ▲  ▲  |       ← Home
                                     ← White
-        >>> Board(perspective=Player.BLACK, board=('BW', 'WBWBWB', 'BW'), config=GameConfiguration(6, 5, 6)).print()
+        >>> print(Board(perspective=Player.BLACK, board=('BW', 'WBWBWB', 'BW'), config=GameConfiguration(6, 5, 6)).draw())
                      Black →
         Goal → ●     |  ▼  ▼  ▼  ▼  ▼  ▼  |     ○ ← Goal
                      |  ●  ○  ●  ○  ●  ○  |
         Home → ○     |  ▲  ▲  ▲  ▲  ▲  ▲  |     ● ← Home
                                     ← White
 
-        >>> Board(perspective=Player.WHITE, board=('BW', 'WBWBWB', 'BW'), config=GameConfiguration(6, 5, 6)).print()
+        >>> print(Board(perspective=Player.WHITE, board=('BW', 'WBWBWB', 'BW'), config=GameConfiguration(6, 5, 6)).draw())
                      White →
         Goal → ○     |  ▼  ▼  ▼  ▼  ▼  ▼  |     ● ← Goal
                      |  ●  ○  ●  ○  ●  ○  |
         Home → ●     |  ▲  ▲  ▲  ▲  ▲  ▲  |     ○ ← Home
                                     ← Black
         """
-        home = [checker for checker in self.checkers if checker.position == Checker.Position('HOME')]
-        goal = [checker for checker in self.checkers if checker.position == Checker.Position('GOAL')]
-        board = [None] * self.config.board_size  # type: List[Optional[Checker]]
+        # Checkers are represented by tuples of the form (is_ghost, Checker)
+        checkers = [(True, checker) for checker in ghost_checkers] + [(False, checker) for checker in self.checkers]
+        home = [checker for checker in checkers if checker[1].position == Checker.Position('HOME')]
+        goal = [checker for checker in checkers if checker[1].position == Checker.Position('GOAL')]
+        board = [None] * self.config.board_size  # type: List[Optional[Tuple[bool, Checker]]]
 
-        for checker in self.checkers:
-            if checker.position.is_concrete:
-                board[checker.position] = checker
+        for checker in checkers:
+            if checker[1].position.is_concrete:
+                board[checker[1].position] = checker
+        
+        def render(checker: Optional[Tuple[bool, Checker]]) -> str:
+            if checker is None:
+                return ' '
+            elif checker[0]:  # if ghost checker
+                return '-'  # f"\u001b[38;5;241m{checker[1].display_symbol}\u001b[0m"
+            else:
+                return checker[1].display_symbol
 
-        board_checkers = '|  ' + '  '.join(
-            [checker.display_symbol if checker is not None else ' ' for checker in board]) + '  |'
+        board_checkers = '|  ' + '  '.join(render(checker) for checker in board) + '  |'
         
         board_top = '| ' + ' ▼ ' * self.config.board_size + ' |'
         board_bottom = '| ' + ' ▲ ' * self.config.board_size + ' |'
         
         # NOTE: left_top/left_bottom and right_top/right_bottom are the same length
-        left_top = 'Goal → ' + ''.join([checker.display_symbol for checker in goal if
-                                        checker.player != self.perspective]).ljust(
+        left_top = 'Goal → ' + ''.join([render(checker) for checker in goal if
+                                        checker[1].player != self.perspective]).ljust(
             self.config.checkers_per_player, ' ') + ' '
-        right_top = ' ' + ''.join([checker.display_symbol for checker in goal if
-                                   checker.player == self.perspective]).rjust(
+        right_top = ' ' + ''.join([render(checker) for checker in goal if
+                                   checker[1].player == self.perspective]).rjust(
             self.config.checkers_per_player, ' ') + ' ← Goal'
         
-        left_bottom = 'Home → ' + ''.join([checker.display_symbol for checker in home if
-                                           checker.player == self.perspective]).ljust(
+        left_bottom = 'Home → ' + ''.join([render(checker) for checker in home if
+                                           checker[1].player == self.perspective]).ljust(
             self.config.checkers_per_player, ' ') + ' '
-        right_bottom = ' ' + ''.join([checker.display_symbol for checker in home if
-                                      checker.player != self.perspective]).rjust(
+        right_bottom = ' ' + ''.join([render(checker) for checker in home if
+                                      checker[1].player != self.perspective]).rjust(
             self.config.checkers_per_player, ' ') + ' ← Home'
         
         top_line = left_top + board_top + right_top
@@ -306,12 +325,19 @@ class Board:
         
         mid_line = ((' ' * len(left_bottom)) + board_checkers)
         
-        print(((' ' * len(left_top)) + self.perspective.long_str + ' →'))
-        print(top_line)
-        print(mid_line)
-        print(bottom_line)
-        print(
-            ('← ' + self.perspective.swapped.long_str).rjust(line_len - len(right_bottom), ' '))
+        return "\n".join([
+            (' ' * len(left_top)) + self.perspective.long_str + ' →',
+            top_line,
+            mid_line,
+            bottom_line,
+            ('← ' + self.perspective.swapped.long_str).rjust(line_len - len(right_bottom), ' ')
+        ])
+    
+    def print(self):
+        """
+        Print the output of draw()
+        """
+        print(self.draw())
     
     def __str__(self):
         home, board, goal = BoardDescription.from_checkers(self.checkers, config=self.config)
@@ -338,6 +364,9 @@ class Board:
             checkers=swap_checkers(self.checkers, self.config),
             config=self.config
         )
+    
+    def from_perspective(self, perspective: Player):
+        return self if self.perspective == perspective else self.swapped
     
     def is_winner(self, player: Player = None) -> bool:
         if player is None:
@@ -436,7 +465,7 @@ class Board:
             if self.is_open(position, player):
                 yield position
 
-    def legal_moves(self, roll: int, player: Player = None) -> Iterator[Move]:
+    def legal_moves(self, roll: int, player: Player = None) -> List[Move]:
         """
         Returns all legal moves for the player (or the perspective player) from the current state.
 
@@ -469,6 +498,8 @@ class Board:
         
         if player is None:
             player = self.perspective
+        
+        moves = []  # type: List[Move]
     
         # All checkers at home are equivalent, so we want to only generate moves for one of them
         had_checker_at_home = False
@@ -495,7 +526,9 @@ class Board:
                 to_pos = Checker.Position('GOAL')
         
             if self.is_open(to_pos):
-                yield Move(self, checker, to_pos)
+                moves += [Move(self, checker, to_pos)]
+        
+        return moves
     
     @classmethod
     def create_starting_board(cls, config: GameConfiguration = GameConfiguration(), perspective: Player = Player.BLACK):
