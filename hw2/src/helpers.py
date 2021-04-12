@@ -1,4 +1,4 @@
-from time import perf_counter
+from time import perf_counter, time as system_time
 from typing import *
 
 T = TypeVar('T')
@@ -126,3 +126,7 @@ class ProgressBar:
 def all_subclasses(cls):
     subclasses = cls.__subclasses__()
     return set(subclasses).union([subsub for sub in subclasses for subsub in all_subclasses(sub)])
+
+
+def random_seed():
+    return round(system_time())

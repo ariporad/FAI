@@ -36,10 +36,7 @@ def main():
     parser.add_argument('-b', '--board-size', help="board size", type=int, default=6)
     parser.add_argument('-c', '--checkers', help="checkers per player", type=int, default=3)
     parser.add_argument('-d', '--die-size', help='die size', type=int, default=6)
-    dicestream_opts = parser.add_mutually_exclusive_group()
-    dicestream_opts.add_argument('-r', '--rolls', action='append', type=int, help="pre-define the values that will be rolled")
-    dicestream_opts.add_argument('-s', '--seed', type=int, default=None, help="specify the seed for the random roll generator")
-    dicestream_opts.add_argument('-R', '--random', action='store_const', const=True, default=True, help="generate random rolls with an arbitrary seed (default)")
+    parser.add_argument('-s', '--seed', type=int, default=None, help="the seed for the random roll generator")
 
     args = parser.parse_args()
 
@@ -48,15 +45,10 @@ def main():
 
     config = GameConfiguration(args.board_size, args.checkers, args.die_size)
 
-    if args.rolls is not None:
-        dicestream = Dicestream.fixed(args.rolls, die_size=config.die_size)
-    else:
-        dicestream = Dicestream.random(seed=args.seed, die_size=config.die_size)
-
     if args.n_pairs == 0:
-        play_game(player1, player2, dicestream=dicestream, config=config)
+        play_game(player1, player2, seed=args.seed, config=config)
     else:
-        play_tournament(player1, player2, args.n_pairs, dicestream, config)
+        play_tournament(player1, player2, args.n_pairs, args.seed, config)
 
 
 if __name__ == '__main__':

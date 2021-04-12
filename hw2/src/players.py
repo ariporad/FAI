@@ -64,3 +64,24 @@ class RandomPlayerAlgorithm(PlayerAlgorithm):
     def play(self, moves: List[Move], roll: int) -> Move:
         return choice(moves)
 
+
+class FirstPlayerAlgorithm(PlayerAlgorithm):
+    """
+    A Nannon player that always moves the furthest-forward checker in the hope of getting as many as possible off the
+    board.
+    """
+    name = "first"
+
+    def play(self, moves: List[Move], roll: int) -> Move:
+        return sorted(moves, key=lambda m: m.checker.position, reverse=True)[0]
+
+
+class LastPlayerAlgorithm(PlayerAlgorithm):
+    """
+    A Nannon player that always moves the checker closest to home in the hope of getting as many as possible on the
+    board.
+    """
+    name = "last"
+
+    def play(self, moves: List[Move], roll: int) -> Move:
+        return sorted(moves, key=lambda m: m.checker.position, reverse=False)[0]
