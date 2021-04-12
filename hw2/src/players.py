@@ -79,8 +79,11 @@ class HumanPlayerAlgorithm(PlayerAlgorithm):
         print(f"Your Turn (You Rolled {roll}):")
         print(join_horizontal((move.draw(Player.BLACK) for move in moves), '\t'))
 
-        selection = int(input(f"Select an Option (1-{len(moves)}):"))
-        if not (1 <= selection <= len(moves)):
+        try:
+            selection = int(input(f"Select an Option (1-{len(moves)}): "))
+            if not (1 <= selection <= len(moves)):
+                raise ValueError()
+        except ValueError:
             print("Invalid Selection!")
             return self.play(moves, roll)
 

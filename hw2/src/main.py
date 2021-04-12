@@ -163,9 +163,11 @@ class Move:
 
     def draw(self, perspective: Player = None) -> str:
         board = self.executed
+        checker = self.checker
         if perspective is not None:
             board = board.from_perspective(perspective)
-        return board.draw([self.checker])
+            checker = checker if not checker.position.is_concrete or self.board.perspective == perspective else Checker(checker.player, self.board.config.board_size - 1 - checker.position)
+        return board.draw([checker])
 
     @property
     def executed(self) -> 'Board':
