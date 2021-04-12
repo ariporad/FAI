@@ -4,7 +4,7 @@ from play_game import play_game
 from players import *
 
 
-def play_tournament(player1, player2, n_pairs: int = 100, dicestream: Dicestream = Dicestream.random(), config: GameConfiguration = GameConfiguration()) -> float:
+def play_tournament(player1: PlayerAlgorithm, player2: PlayerAlgorithm, n_pairs: int = 100, dicestream: Dicestream = Dicestream.random(), config: GameConfiguration = GameConfiguration()) -> float:
     """
     Play player1 against player2 `2 * n_pairs` times, and return the proportion of the time that player1 wins.
     """
@@ -24,4 +24,4 @@ def play_tournament(player1, player2, n_pairs: int = 100, dicestream: Dicestream
     
     
 if __name__ == '__main__':
-    play_tournament(random_player, random_player)
+    play_tournament(RandomPlayerAlgorithm(), RandomPlayerAlgorithm())

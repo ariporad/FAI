@@ -122,3 +122,7 @@ class ProgressBar:
         else:
             return f"{seconds // 3600}h{(seconds % 3600) // 60}m{seconds % 60}s"
             
+
+def all_subclasses(cls):
+    subclasses = cls.__subclasses__()
+    return set(subclasses).union([subsub for sub in subclasses for subsub in all_subclasses(sub)])

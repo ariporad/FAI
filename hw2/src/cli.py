@@ -23,14 +23,15 @@ def main():
 
     import argparse
 
-    from players import PLAYERS
+    from players import PlayerAlgorithm
     from Dicestream import Dicestream
     from play_game import play_game
     from play_tournament import play_tournament
     from main import GameConfiguration
     parser = argparse.ArgumentParser()
-    parser.add_argument("player1", choices=PLAYERS.keys(), help="player 1 algorithm")
-    parser.add_argument("player2", choices=PLAYERS.keys(), help="player 2 algorithm")
+
+    parser.add_argument("player1", choices=[a.name for a in PlayerAlgorithm.all()], help="player 1 algorithm")
+    parser.add_argument("player2", choices=[a.name for a in PlayerAlgorithm.all()], help="player 2 algorithm")
     parser.add_argument("-n", "--n-pairs", help="number of matches to run", type=int, default=0)
     parser.add_argument('-b', '--board-size', help="board size", type=int, default=6)
     parser.add_argument('-c', '--checkers', help="checkers per player", type=int, default=3)
@@ -42,8 +43,8 @@ def main():
 
     args = parser.parse_args()
 
-    player1 = PLAYERS[args.player1]
-    player2 = PLAYERS[args.player2]
+    player1 = PlayerAlgorithm.get(args.player1.lower().strip())
+    player2 = PlayerAlgorithm.get(args.player2.lower().strip())
 
     config = GameConfiguration(args.board_size, args.checkers, args.die_size)
 

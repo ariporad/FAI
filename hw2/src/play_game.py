@@ -5,10 +5,11 @@ from Dicestream import *
 from main import Board, Turn, GameConfiguration
 
 
-def play_game(black_player, white_player, dicestream: Dicestream = None, rolls: List[int] = None, seed: int = None,
-               config: GameConfiguration = GameConfiguration(), silent=False) -> Player:
+def play_game(black_player: PlayerAlgorithm, white_player: PlayerAlgorithm,
+              dicestream: Dicestream = None, rolls: List[int] = None, seed: int = None,
+              config: GameConfiguration = GameConfiguration(), silent=False) -> Player:
     if not silent:
-        print(f"Playing a Game of Nannon{config}! Black: {black_player.__name__}, White: {white_player.__name__}")
+        print(f"Playing a Game of Nannon{config}! Black: {black_player.name}, White: {white_player.name}")
     
     if dicestream is None:
         if rolls is not None:
@@ -34,20 +35,24 @@ def play_game(black_player, white_player, dicestream: Dicestream = None, rolls: 
         
         if len(legal_moves) == 0:
             if not silent:
-                print(f"{turn.player.long_str} rolled {roll}, but couldn't make any moves! SKIPPED!")
+                print(f"{turn.player.long_str} ({player.name}) rolled {roll}, but couldn't make any moves! SKIPPED!")
             turn = Turn(turn.board, player=turn.player.swapped, dicestream=turn.dicestream)
             continue
-            
-        if turn.player == Player.BLACK:
-            turn = turn.make(black_player(legal_moves, roll))
-        else:
-            turn = turn.make(white_player(legal_moves, roll))
+
+        player = black_player if turn.player == Player.BLACK else white_player
+        move = player.play(legal_moves, roll)
+
+        if not silent and not player.force_silent:
+            print(f"{turn.player.long_str} ({player.name}) rolled {roll} and played:")
+            print(move.draw())
+
+        turn = turn.make(move)
     
     if not silent:
-        print(f"Winner: {turn.board.whowon.long_str} ({(black_player if turn.board.whowon == Player.BLACK else white_player).__name__})! ")
+        print(f"Winner: {turn.board.whowon.long_str} ({(black_player if turn.board.whowon == Player.BLACK else white_player).name})! ")
     
     return turn.board.whowon
     
     
 if __name__ == '__main__':
-    play_game(human_player, verbose_random_player)
+    play_game(HumanPlayerAlgorithm(), RandomPlayerAlgorithm())
