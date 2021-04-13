@@ -58,6 +58,7 @@ def play_game(black_player: PlayerAlgorithm, white_player: PlayerAlgorithm,
             print(move.draw(Player.BLACK))
 
         board = move.executed
+        cur_player = cur_player.swapped
 
     if not silent:
         print(f"Winner: {board.whowon.long_str} ({(black_player if board.whowon == Player.BLACK else white_player).name})! ")
