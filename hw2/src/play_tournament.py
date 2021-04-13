@@ -1,4 +1,4 @@
-from main import GameConfiguration
+from structs import GameConfiguration
 from Dicestream import Dicestream
 from play_game import play_game
 from players import *

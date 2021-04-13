@@ -1,8 +1,64 @@
-from typing import *
+"""
+This file contains various data containers (structs in other languages, hence the name), which contain no real logic.
+"""
+from enum import Enum
 from dataclasses import dataclass
-from functools import total_ordering, cached_property
+from functools import total_ordering, cached_property, cache
+from typing import *
 
-from Player import Player
+
+class Player(Enum):
+    """
+    An enum representing both options for players (Black and White).
+    """
+    BLACK = 'BLACK'
+    WHITE = 'WHITE'
+
+    @property
+    def swapped(self) -> 'Player':
+        return Player.BLACK if self == Player.WHITE else Player.WHITE
+
+    @property
+    def short_str(self) -> str:
+        """
+        A very short (ie. one letter) symbol identifying the player, mostly used for debugging.
+        """
+        return "B" if self == Player.BLACK else "W"
+
+    @property
+    def long_str(self) -> str:
+        """
+        Human-readable name of this player.
+        """
+        return "Black" if self == Player.BLACK else "White"
+
+    @cached_property
+    def int_value(self):
+        return 1 if self == Player.BLACK else 2
+
+    def __repr__(self):
+        return "Player.BLACK" if self == Player.BLACK else "Player.WHITE"
+
+
+class GameConfiguration(NamedTuple):
+    """
+    A named tuple representing the particular variant of Nannon we're playing. Completely immutable.
+
+    The defaults represent standard Nannon, with a 6 positions on the board, 3 checkers per player,
+    and a standard six-sided die.
+    """
+
+    board_size: int = 6
+    checkers_per_player: int = 3
+    die_size: int = 6
+
+    # def __new__(cls, board_size, checkers_per_player, die_size):
+    #     assert checkers_per_player < die_size, "checkers per player must be less than die size to avoid stalemates"
+    #     return super(cls, GameConfiguration).__new__(GameConfiguration, (board_size, checkers_per_player, die_size))
+
+    def __str__(self):
+        return f"{{{self.board_size},{self.checkers_per_player},{self.die_size}}}"
+
 
 
 @dataclass
@@ -48,12 +104,12 @@ class Checker:
         >>> Checker.Position('HOME')
         -1
         """
-        
+
         HOME_VALUE = -1
         GOAL_VALUE = 100  # this just needs to be bigger than any other position
-        
+
         Value = Union[int, Literal['HOME', 'GOAL'], 'Checker.Position']
-        
+
         def __new__(cls, value: Value):
             if isinstance(value, str):
                 if value == 'HOME':
@@ -73,7 +129,7 @@ class Checker:
 
         def swap(self, board_size: int) -> 'Checker.Position':
             return Checker.Position(board_size - 1 - self)
-    
+
         @property
         def name(self) -> str:
             if self == Checker.Position('GOAL'):
@@ -82,18 +138,17 @@ class Checker:
                 return "HOME"
             else:
                 return int.__str__(self)
-            
 
     player: Player
     position: Position
-    
+
     def __post_init__(self):
         if not isinstance(self.position, Checker.Position):
             self.position = Checker.Position(self.position)
 
     def __str__(self):
         return f"Checker({self.player.short_str} @ {self.position.name})"
-    
+
     def __eq__(self, other: 'Checker'):
         return self.hash_value == other.hash_value
 
@@ -104,13 +159,13 @@ class Checker:
     @cached_property
     def hash_value(self):
         return (self.position << 2) + self.player.int_value
-    
+
     def __lt__(self, other: 'Checker'):
         if self.position != other.position:
             return self.position < other.position
         else:
             return self.player == Player.BLACK
-    
+
     @property
     def display_symbol(self) -> str:
         return '○' if self.player == Player.BLACK else '●'

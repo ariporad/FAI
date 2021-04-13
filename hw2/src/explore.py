@@ -1,8 +1,8 @@
 from typing import *
 
 from helpers import *
-from main import Turn, Board, GameConfiguration
-from Player import Player
+from structs import GameConfiguration, Player
+from Board import Turn, Board
 
 
 def explore(config: GameConfiguration = GameConfiguration()):

@@ -1,29 +1,10 @@
-#!/usr/bin/env python3
-from functools import cached_property, cache
+from typing import *
+from dataclasses import dataclass
+from functools import cache, cached_property
 
-from Checker import *
-from Dicestream import *
 from helpers import *
-
-
-class GameConfiguration(NamedTuple):
-    """
-    A named tuple representing the particular variant of Nannon we're playing. Completely immutable.
-
-    The defaults represent standard Nannon, with a 6 positions on the board, 3 checkers per player,
-    and a standard six-sided die.
-    """
-    
-    board_size: int = 6
-    checkers_per_player: int = 3
-    die_size: int = 6
-    
-    # def __new__(cls, board_size, checkers_per_player, die_size):
-    #     assert checkers_per_player < die_size, "checkers per player must be less than die size to avoid stalemates"
-    #     return super(cls, GameConfiguration).__new__(GameConfiguration, (board_size, checkers_per_player, die_size))
-
-    def __str__(self):
-        return f"{{{self.board_size},{self.checkers_per_player},{self.die_size}}}"
+from structs import *
+from Dicestream import Dicestream
 
 
 class BoardDescription(NamedTuple):
@@ -36,7 +17,7 @@ class BoardDescription(NamedTuple):
     checker (or lack thereof) at the relevant position. The perspective player's home (which is not
     tracked by this class) is always at the left.
     """
-    
+
     home: str
     board: str
     goal: str
@@ -46,12 +27,11 @@ class BoardDescription(NamedTuple):
         # Using numerical indexes to allow comparing against normal tuples
         return isinstance(other, tuple) and sorted(self[0]) == sorted(other[0]) and self[1] == other[1] and sorted(
             self[2]) == sorted(other[2])
-    
+
     def __ne__(self, other):
         return not (self == other)
-    
+
     @classmethod
-    @cache
     def from_checkers(cls, checkers: List[Checker], config: GameConfiguration = GameConfiguration()):
         """
         Convert from a list of Checkers to a BoardDescription.
@@ -67,18 +47,18 @@ class BoardDescription(NamedTuple):
             [checker.player.short_str for checker in checkers if checker.position == Checker.Position('HOME')])
         goal = ''.join(
             [checker.player.short_str for checker in checkers if checker.position == Checker.Position('GOAL')])
-        
+
         board = ['-'] * config.board_size
-        
+
         for checker in checkers:
             if not checker.position.is_concrete:
                 continue
-            
+
             board[checker.position] = checker.player.short_str
-        
+
         return cls(home, ''.join(board), goal)
-    
-    @cached_property
+
+    @property
     def checkers(self) -> List[Checker]:
         """
         Convert this BoardDescription to a list of Checkers.
@@ -98,35 +78,20 @@ class BoardDescription(NamedTuple):
         Checker(W @ 5)
         """
         checkers = []  # type: List[Checker]
-        
+
         checkers += [Checker(Player.BLACK, Checker.Position('HOME'))] * self.home.count('B')
         checkers += [Checker(Player.WHITE, Checker.Position('HOME'))] * self.home.count('W')
-        
+
         checkers += [Checker(Player.BLACK, Checker.Position('GOAL'))] * self.goal.count('B')
         checkers += [Checker(Player.WHITE, Checker.Position('GOAL'))] * self.goal.count('W')
-        
+
         for i in range(0, len(self.board)):
             if self.board[i] == 'B':
                 checkers += [Checker(Player.BLACK, Checker.Position(i))]
             elif self.board[i] == 'W':
                 checkers += [Checker(Player.WHITE, Checker.Position(i))]
-        
+
         return checkers
-
-
-def swap_checkers(checkers: Iterable[Checker], config: GameConfiguration) -> List[Checker]:
-    """
-    Swap a list of checkers from one player's perspective to the other:
-
-    >>> print_each(swap_checkers([Checker(Player.BLACK, 2), Checker(Player.WHITE, 1), Checker(Player.BLACK, 'HOME')], GameConfiguration()))
-    Checker(B @ 3)
-    Checker(B @ HOME)
-    Checker(W @ 4)
-    """
-    return [Checker(
-        checker.player,
-        config.board_size - 1 - checker.position if checker.position.is_concrete else checker.position
-    ) for checker in checkers]
 
 
 @dataclass(frozen=True)
@@ -142,10 +107,10 @@ class Move:
     board: 'Board'
     checker: Checker
     to: Checker.Position
-    
+
     def __str__(self):
         return f"Move({self.checker.player.short_str}: {self.checker.position.name} -> {self.to.name})"
-    
+
     @property
     def player(self) -> Player:
         return self.checker.player
@@ -165,18 +130,20 @@ class Move:
         checker = self.checker
         if perspective is not None:
             board = board.from_perspective(perspective)
-            checker = checker if not checker.position.is_concrete or self.board.perspective == perspective else Checker(checker.player, self.board.config.board_size - 1 - checker.position)
+            checker = checker if not checker.position.is_concrete or self.board.perspective == perspective else Checker(
+                checker.player, self.board.config.board_size - 1 - checker.position)
         return board.draw([checker])
 
     @cached_property
     def captured(self) -> Optional[Checker]:
-        return only(checker for checker in self.board.checkers if (self.to.is_concrete and checker.position == self.to and checker.player != self.player))
+        return only(checker for checker in self.board.checkers if
+                    (self.to.is_concrete and checker.position == self.to and checker.player != self.player))
 
     @cached_property
     def executed(self) -> 'Board':
         """
         Return the resulting board after this move has been executed.
-        
+
         >>> print(Move.create(3, 4, Board(perspective=Player.BLACK, board=('', 'BWWBWB', ''))).executed)
         Board{6,3,6}(B: W [BWW-BB] -)
         >>> print(Move.create(5, 'GOAL', Board(perspective=Player.WHITE, board=('', 'BWWBWB', ''))).executed)
@@ -196,10 +163,10 @@ class Move:
                 new_checkers += [Checker(checker.player, Checker.Position('HOME'))]
             else:
                 new_checkers += [checker]
-        
+
         # Add the newly-moved checker
         new_checkers += [Checker(self.checker.player, self.to)]
-        
+
         return Board(perspective=self.board.perspective, checkers=new_checkers, config=self.board.config)
 
 
@@ -210,16 +177,16 @@ class Board:
     Any given turn can be seen from either player's perspective, irrespective of if it is that
     player's turn.
     """
-    
+
     perspective: Player
     """ From who's perspective are we looking at the board? """
-    
+
     checkers: List[Checker]
     """ All checker is play. Always a list of length 2 * checkers_per_player """
-    
+
     config: GameConfiguration
     """ The configuration representing the variant of Nannon we're playing. """
-    
+
     def __init__(self, board: Union[BoardDescription, Tuple[str, str, str]] = None, checkers: list[Checker] = None,
                  perspective: Player = Player.BLACK, config: GameConfiguration = GameConfiguration()):
         """
@@ -231,18 +198,19 @@ class Board:
         Board{8,3,6}(B: - [BWB--WBW] -)
         """
         assert board is None or checkers is None, "can only provide board OR checkers, not both!"
-        
+
         if board:
-            if isinstance(board, tuple) and not isinstance(board, BoardDescription) and len(board) == 3:
+            if True or isinstance(board, tuple) and not isinstance(board, BoardDescription) and len(board) == 3:
                 board = BoardDescription(board[0], board[1], board[2])
             checkers = board.checkers
 
-        assert len(checkers) == config.checkers_per_player * 2, f"incorrect number of checkers! (Expected {config.checkers_per_player * 2}, Got {len(checkers)})"
-        
+        assert len(
+            checkers) == config.checkers_per_player * 2, f"incorrect number of checkers! (Expected {config.checkers_per_player * 2}, Got {len(checkers)})"
+
         # Sanity Checks
         assert is_unique([checker.position for checker in checkers if checker.position.is_concrete]), \
             "two checkers on the same spot!"
-        
+
         self.perspective = perspective
         self.checkers = sorted(checkers)
         self.config = config
@@ -250,7 +218,7 @@ class Board:
     def draw(self, ghost_checkers: List[Checker] = []) -> str:
         """
         Return a string with a human-readable view of the board.
-        
+
         If ghost_checkers is provided, those checkers will be rendered greyed-out.
 
         >>> print(Board(perspective=Player.BLACK, board=('BBBWWW', '-B--W-', 'BW'), config=GameConfiguration(6, 5, 6)).draw())
@@ -294,7 +262,7 @@ class Board:
         for checker in checkers:
             if checker[1].position.is_concrete:
                 board[checker[1].position] = checker
-        
+
         def render(checker: Optional[Tuple[bool, Checker]]) -> str:
             if checker is None:
                 return ' '
@@ -304,10 +272,10 @@ class Board:
                 return checker[1].display_symbol
 
         board_checkers = '|  ' + '  '.join(render(checker) for checker in board) + '  |'
-        
+
         board_top = '| ' + ' ▼ ' * self.config.board_size + ' |'
         board_bottom = '| ' + ' ▲ ' * self.config.board_size + ' |'
-        
+
         # NOTE: left_top/left_bottom and right_top/right_bottom are the same length
         left_top = 'Goal → ' + ''.join([render(checker) for checker in goal if
                                         checker[1].player != self.perspective]).ljust(
@@ -315,21 +283,21 @@ class Board:
         right_top = ' ' + ''.join([render(checker) for checker in goal if
                                    checker[1].player == self.perspective]).rjust(
             self.config.checkers_per_player, ' ') + ' ← Goal'
-        
+
         left_bottom = 'Home → ' + ''.join([render(checker) for checker in home if
                                            checker[1].player == self.perspective]).ljust(
             self.config.checkers_per_player, ' ') + ' '
         right_bottom = ' ' + ''.join([render(checker) for checker in home if
                                       checker[1].player != self.perspective]).rjust(
             self.config.checkers_per_player, ' ') + ' ← Home'
-        
+
         top_line = left_top + board_top + right_top
         bottom_line = left_bottom + board_bottom + right_bottom
-        
+
         line_len = len(bottom_line)
-        
+
         mid_line = ((' ' * len(left_bottom)) + board_checkers)
-        
+
         return "\n".join([
             (' ' * len(left_top)) + self.perspective.long_str + ' →',
             top_line,
@@ -337,24 +305,24 @@ class Board:
             bottom_line,
             ('← ' + self.perspective.swapped.long_str).rjust(line_len - len(right_bottom), ' ')
         ])
-    
+
     def print(self):
         """
         Print the output of draw()
         """
         print(self.draw())
-    
+
     def __str__(self):
         home, board, goal = BoardDescription.from_checkers(self.checkers, config=self.config)
-        
+
         return f"Board{self.config}({self.perspective.short_str}: {home or '-'} [{board}] {goal or '-'})"
-    
+
     def __eq__(self, other: 'Board'):
         return self.perspective == other.perspective and self.config == other.config and self.checkers == other.checkers
-    
+
     def __hash__(self):
         return hash((self.perspective, self.config, tuple(self.checkers)))
-    
+
     @cached_property
     def swapped(self):
         """
@@ -364,19 +332,19 @@ class Board:
         >>> print(Board(perspective=Player.BLACK, board=('BW', '-B--W-', 'BW')).swapped)
         Board{6,3,6}(W: BW [-W--B-] BW)
         """
-        return Board(
-            perspective=self.perspective.swapped,
-            checkers=swap_checkers(self.checkers, self.config),
-            config=self.config
-        )
-    
+        checkers = [Checker(
+            checker.player,
+            self.config.board_size - 1 - checker.position if checker.position.is_concrete else checker.position
+        ) for checker in self.checkers]
+        return Board(perspective=self.perspective.swapped, checkers=checkers, config=self.config)
+
     def from_perspective(self, perspective: Player):
         return self if self.perspective == perspective else self.swapped
-    
+
     def is_winner(self, player: Player = None) -> bool:
         if player is None:
             player = self.perspective
-        
+
         return all(
             checker.position == Checker.Position('GOAL') for checker in self.checkers if checker.player == player
         )
@@ -408,14 +376,14 @@ class Board:
     def is_open(self, position: Checker.Position, player: Player = None) -> bool:
         """
         Check if the perspective's player _could_ move a checker to the given position, if they had a suitable roll.
-        
+
         NOTE: This method does not take into account if the player has the checker to move, nor if it's their turn.
 
         _Tested via open_positions._
         """
         if player is None:
             player = self.perspective
-        
+
         if position == Checker.Position('GOAL'):  # The goal is always open
             return True
         elif position == Checker.Position('HOME'):  # The home is never open
@@ -439,7 +407,7 @@ class Board:
                     if maybe_protector is not None and maybe_protector.player == player.swapped:
                         return False
         return True
-    
+
     @cached_property
     def open_positions(self, player: Player = None) -> Iterator[Checker.Position]:
         """
@@ -464,7 +432,7 @@ class Board:
         """
         # The goal is always open
         yield Checker.Position('GOAL')
-        
+
         # Check all the other spots
         for i in range(0, self.config.board_size):
             position = Checker.Position(i)
@@ -502,39 +470,39 @@ class Board:
         # roll their dice, and the winner gets the difference between the rolls (in case of tie, roll again). A checker
         # cannot legally land on another checker of the same color, nor on any of the opponent which are protected by an
         # adjacent checker on the board. Landing on a singleton opponent checker hits it back off the board.
-        
+
         if player is None:
             player = self.perspective
-        
+
         moves = []  # type: List[Move]
-    
+
         # All checkers at home are equivalent, so we want to only generate moves for one of them
         had_checker_at_home = False
-    
+
         for checker in self.checkers:
             # We can't move our opponent's checkers
             if checker.player != player:
                 continue
-        
+
             # A checker in the goal never moves
             if checker.position == Checker.Position('GOAL'):
                 continue
-        
+
             if checker.position == Checker.Position('HOME'):
                 if had_checker_at_home:
                     continue
                 had_checker_at_home = True
-        
+
             to_idx = roll + checker.position
-        
+
             if to_idx < self.config.board_size:
                 to_pos = Checker.Position(to_idx)
             else:
                 to_pos = Checker.Position('GOAL')
-        
+
             if self.is_open(to_pos):
                 moves += [Move(self, checker, to_pos)]
-        
+
         return moves
 
     @classmethod
@@ -557,21 +525,21 @@ class Board:
         # TODO: the spec is unclear as to the starting configuration for size > 6
         checkers_start_on_board = min(config.checkers_per_player - 1, (config.board_size // 2) - 1)
         checkers_at_home = config.checkers_per_player - checkers_start_on_board
-        
+
         checkers = [
                        Checker(perspective, Checker.Position('HOME')),
                        Checker(perspective.swapped, Checker.Position('HOME'))
                    ] * checkers_at_home
-        
+
         for i in range(0, checkers_start_on_board):
             checkers += [
                 Checker(perspective, Checker.Position(i)),
                 Checker(perspective.swapped, Checker.Position(config.board_size - 1 - i))
             ]
-            
+
         # Sanity Check
         assert len(checkers) == 2 * config.checkers_per_player, "wrong number of checkers!"
-        
+
         return cls(checkers=checkers, perspective=perspective, config=config)
 
 
@@ -584,18 +552,18 @@ class Turn:
     """
     board: Board
     """ The current board. """
-    
+
     player: Player
     """ Who's turn is it? """
-    
+
     dicestream: Dicestream
     """
     The dicestream we're using. Importantly, this is only touched once at creation time when this
     turn's roll is calculated.
     """
-    
+
     def __init__(self, board: Board, player: Player = Player.BLACK,
-        dicestream: Dicestream = None, seed: int = None, rolls: List[int] = None):
+                 dicestream: Dicestream = None, seed: int = None, rolls: List[int] = None):
         """
         >>> print(Turn(Board(('BW', 'B----W', 'WB')), seed=1))
         <Turn(B): Board{6,3,6}(B: BW [B----W] BW)>
@@ -613,31 +581,31 @@ class Turn:
         else:
             assert seed is None, "seed cannot be provided if dicestream is provided"
             assert rolls is None, "rolls cannot be provided if dicestream is provided"
-        
+
         # Sanity Checks
         assert dicestream.die_size == board.config.die_size, "dicestream's die size must match game config's die_size!"
         # FIXME: assert config.die_size >= abs(roll) >= 1, "roll must be in range [1, die_size]"
         assert \
             is_unique(checker.position for checker in board.checkers if checker.position.is_concrete), \
             "two checkers on the same spot!"
-        
+
         if board.perspective != player:
             board = board.swapped
 
         self.board = board
         self.player = player
         self.dicestream = dicestream
-        
+
     def __str__(self):
         return f"<Turn({self.player.short_str}): {str(self.board)}>"
-    
+
     def __eq__(self, other: 'Turn'):
         # FIXME: Ignores dicestream
         return self.board == other.board and self.player == other.player
-    
+
     def __hash__(self):
         return hash((self.board, self.player))
-    
+
     @cached_property
     def is_winner(self) -> bool:
         return self.board.is_winner(self.player)
@@ -651,57 +619,3 @@ class Turn:
         assert move.player == self.player, "cannot make a move out of turn!"
         return Turn(move.executed, player=self.player.swapped, dicestream=self.dicestream)
 
-
-def start_game(dicestream: Dicestream = None, rolls: List[int] = None, seed: int = None,
-               config: GameConfiguration = GameConfiguration(), perspective: Player = Player.BLACK):
-    """
-    Create a starting game state.
-
-    >>> print(start_game(rolls=[1, 2, 3]))
-    <Turn(W): Board{6,3,6}(W: BW [WW--BB] -)>
-    >>> print(start_game(rolls=[1, 2, 3], config=GameConfiguration(6, 3, 6)))
-    <Turn(W): Board{6,3,6}(W: BW [WW--BB] -)>
-    >>> print(start_game(seed=1, config=GameConfiguration(7, 4, 6)))
-    <Turn(W): Board{7,4,6}(W: BBWW [WW---BB] -)>
-    >>> print(start_game(Dicestream.fixed([1, 2]), perspective=Player.WHITE, config=GameConfiguration(8, 3, 6)))
-    <Turn(W): Board{8,3,6}(W: BW [BB----WW] -)>
-    >>> print(start_game(Dicestream.fixed([1, 2]), perspective=Player.WHITE, config=GameConfiguration(8, 4, 6)))
-    <Turn(W): Board{8,4,6}(W: BW [BBB--WWW] -)>
-    """
-    if dicestream is None:
-        if rolls is not None:
-            dicestream = Dicestream.fixed(rolls)
-            assert seed is None, "seed cannot be provided if rolls is provided"
-        else:
-            dicestream = Dicestream.random(config.die_size, seed)
-    else:
-        assert seed is None, "seed cannot be provided if dicestream is provided"
-        assert rolls is None, "rolls cannot be provided if dicestream is provided"
-    
-    starting_roll = dicestream.first_roll()
-    starting_player = Player.BLACK
-    if starting_roll < 0:
-        starting_roll *= -1
-        starting_player = Player.WHITE
-    
-    # TODO: the spec is unclear as to the starting configuration for size > 6
-    checkers_start_on_board = min(config.checkers_per_player - 1, (config.board_size // 2) - 1)
-    blank_spaces = config.board_size - (checkers_start_on_board * 2)
-    checkers_at_home = config.checkers_per_player - checkers_start_on_board
-    
-    # Black's home is always on the left
-    board = ('B' * checkers_start_on_board) + ('-' * blank_spaces) + ('W' * checkers_start_on_board)
-    
-    initial_state = Turn(board=Board(('BW' * checkers_at_home, board, ''), config=config, perspective=perspective),
-                        player=starting_player, dicestream=dicestream)
-    
-    return initial_state
-
-
-if __name__ == "__main__":
-    import doctest
-    
-    # Run all the unit tests
-    failures, tests = doctest.testmod()
-    if failures == 0 and tests > 0:
-        print("Tests Passed!")

@@ -28,7 +28,7 @@ def main():
     from play_tournament import play_tournament
     from bulk_tournament import bulk_tournament
     from roundrobin import roundrobin
-    from main import GameConfiguration
+    from structs import GameConfiguration
     parser = argparse.ArgumentParser()
 
     parser.add_argument("mode", choices=['g', 'game', 't', 'tournament', 'r', 'roundrobin'], help="game mode")

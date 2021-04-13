@@ -1,4 +1,4 @@
-from main import GameConfiguration
+from structs import GameConfiguration
 from bulk_tournament import bulk_tournament
 from players import *
 

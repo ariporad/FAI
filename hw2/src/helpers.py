@@ -1,5 +1,5 @@
-from time import perf_counter, time as system_time
 from typing import *
+from time import perf_counter, time as system_time
 
 T = TypeVar('T')
 

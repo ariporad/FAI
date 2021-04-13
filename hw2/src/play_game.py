@@ -1,7 +1,10 @@
 from typing import *
+
+from structs import *
 from players import *
-from Dicestream import *
-from main import Board, Turn, GameConfiguration
+
+from Board import Board, Turn
+from Dicestream import Dicestream
 
 
 def play_game(black_player: PlayerAlgorithm, white_player: PlayerAlgorithm,

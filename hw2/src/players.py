@@ -2,7 +2,8 @@ from random import choice
 from functools import cache
 
 from helpers import *
-from main import Move, Player, Board, Checker
+from structs import Player,Checker
+from Board import Board, Move
 
 
 class PlayerAlgorithm:
