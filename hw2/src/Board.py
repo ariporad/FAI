@@ -101,8 +101,8 @@ class Move:
     since Checkers are immutable, means it hasn't moved yet), and `to` is defined relative to `turn` (including the
     perspective.)
 
-    NOTE: Since Moves, Turns, Checkers, and Positions are all immutable, this class represents a possible but
-    not-yet-executed move. To execute the move, call Move#make (which returns a new Turn).
+    NOTE: Since Moves, Checkers, and Positions are all immutable, this class represents a possible but not-yet-executed
+    move. The board that results from making this move can be calculated with Move.executed.
     """
     board: 'Board'
     checker: Checker
@@ -212,7 +212,7 @@ class Board:
             "two checkers on the same spot!"
 
         self.perspective = perspective
-        self.checkers = sorted(checkers)
+        self.checkers = tuple(sorted(checkers))
         self.config = config
 
     def draw(self, ghost_checkers: List[Checker] = []) -> str:
@@ -474,6 +474,9 @@ class Board:
         if player is None:
             player = self.perspective
 
+        if player != self.perspective:
+            return self.from_perspective(player).legal_moves(roll)
+
         moves = []  # type: List[Move]
 
         # All checkers at home are equivalent, so we want to only generate moves for one of them
@@ -541,81 +544,3 @@ class Board:
         assert len(checkers) == 2 * config.checkers_per_player, "wrong number of checkers!"
 
         return cls(checkers=checkers, perspective=perspective, config=config)
-
-
-class Turn:
-    """
-    A dataclass representing a turn of the game. Completely immutable.
-
-    Any given turn can be seen from either player's perspective, irrespective of if it is that
-    player's turn.
-    """
-    board: Board
-    """ The current board. """
-
-    player: Player
-    """ Who's turn is it? """
-
-    dicestream: Dicestream
-    """
-    The dicestream we're using. Importantly, this is only touched once at creation time when this
-    turn's roll is calculated.
-    """
-
-    def __init__(self, board: Board, player: Player = Player.BLACK,
-                 dicestream: Dicestream = None, seed: int = None, rolls: List[int] = None):
-        """
-        >>> print(Turn(Board(('BW', 'B----W', 'WB')), seed=1))
-        <Turn(B): Board{6,3,6}(B: BW [B----W] BW)>
-        >>> print(Turn(Board(('', 'BWBWBW', '')), seed=1))
-        <Turn(B): Board{6,3,6}(B: - [BWBWBW] -)>
-        >>> print(Turn(Board(('', 'BWB--WBW', ''), config=GameConfiguration(8, 3, 6)), seed=1))
-        <Turn(B): Board{8,3,6}(B: - [BWB--WBW] -)>
-        """
-        if dicestream is None:
-            if rolls is not None:
-                dicestream = Dicestream.fixed(rolls)
-                assert seed is None, "seed cannot be provided if rolls is provided"
-            else:
-                dicestream = Dicestream.random(board.config.die_size, seed)
-        else:
-            assert seed is None, "seed cannot be provided if dicestream is provided"
-            assert rolls is None, "rolls cannot be provided if dicestream is provided"
-
-        # Sanity Checks
-        assert dicestream.die_size == board.config.die_size, "dicestream's die size must match game config's die_size!"
-        # FIXME: assert config.die_size >= abs(roll) >= 1, "roll must be in range [1, die_size]"
-        assert \
-            is_unique(checker.position for checker in board.checkers if checker.position.is_concrete), \
-            "two checkers on the same spot!"
-
-        if board.perspective != player:
-            board = board.swapped
-
-        self.board = board
-        self.player = player
-        self.dicestream = dicestream
-
-    def __str__(self):
-        return f"<Turn({self.player.short_str}): {str(self.board)}>"
-
-    def __eq__(self, other: 'Turn'):
-        # FIXME: Ignores dicestream
-        return self.board == other.board and self.player == other.player
-
-    def __hash__(self):
-        return hash((self.board, self.player))
-
-    @cached_property
-    def is_winner(self) -> bool:
-        return self.board.is_winner(self.player)
-
-    @cache
-    def make(self, move: Move) -> 'Turn':
-        """
-        Make a move and return the resulting turn.
-        """
-        assert move.board == self.board, "cannot make a move not for this board!"
-        assert move.player == self.player, "cannot make a move out of turn!"
-        return Turn(move.executed, player=self.player.swapped, dicestream=self.dicestream)
-

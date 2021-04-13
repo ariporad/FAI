@@ -3,7 +3,7 @@ from typing import *
 from structs import *
 from players import *
 
-from Board import Board, Turn
+from Board import Board
 from Dicestream import Dicestream
 
 
@@ -31,21 +31,22 @@ def play_game(black_player: PlayerAlgorithm, white_player: PlayerAlgorithm,
         starting_roll *= -1
         starting_player = Player.WHITE
         
-    turn = Turn(Board.create_starting_board(config, starting_player), player=starting_player, dicestream=dicestream)
+    board = Board.create_starting_board(config, starting_player)
+    cur_player = starting_player
 
     is_first_turn = True
-    while turn.board.whowon is None:
+    while board.whowon is None:
         roll = starting_roll if is_first_turn else dicestream.roll()
-        player = black_player if turn.player == Player.BLACK else white_player
-        assert turn.board.perspective == turn.player
-        legal_moves = turn.board.legal_moves(roll)
+        player = black_player if cur_player == Player.BLACK else white_player
+        board = board.from_perspective(cur_player)
+        legal_moves = board.legal_moves(roll)
         is_first_turn = False
 
         num_moves = len(legal_moves)
         if num_moves == 0:
             if not silent:
-                print(f"{turn.player.long_str} ({player.name}) rolled {roll}, but couldn't make any moves! SKIPPED!")
-            turn = Turn(turn.board, player=turn.player.swapped, dicestream=turn.dicestream)
+                print(f"{cur_player.long_str} ({player.name}) rolled {roll}, but couldn't make any moves! SKIPPED!")
+            cur_player = cur_player.swapped
             continue
         elif num_moves == 1:
             move = legal_moves[0]
@@ -53,15 +54,15 @@ def play_game(black_player: PlayerAlgorithm, white_player: PlayerAlgorithm,
             move = player.play(legal_moves, roll)
 
         if not silent and not player.force_silent:
-            print(f"{turn.player.long_str} ({player.name}) rolled {roll} and played:")
+            print(f"{cur_player.long_str} ({player.name}) rolled {roll} and played:")
             print(move.draw(Player.BLACK))
 
-        turn = turn.make(move)
+        board = move.executed
 
     if not silent:
-        print(f"Winner: {turn.board.whowon.long_str} ({(black_player if turn.board.whowon == Player.BLACK else white_player).name})! ")
+        print(f"Winner: {board.whowon.long_str} ({(black_player if board.whowon == Player.BLACK else white_player).name})! ")
     
-    return turn.board.whowon
+    return board.whowon
     
     
 if __name__ == '__main__':
