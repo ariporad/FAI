@@ -25,6 +25,9 @@ class Player(Enum):
 		Human-readable name of this player.
 		"""
 		return "Black" if self == Player.BLACK else "White"
-	
+
+	def int_value(self):
+		return 1 if self == Player.BLACK else 2
+
 	def __repr__(self):
 		return "Player.BLACK" if self == Player.BLACK else "Player.WHITE"

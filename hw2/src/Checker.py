@@ -1,6 +1,6 @@
 from typing import *
 from dataclasses import dataclass
-from functools import total_ordering
+from functools import total_ordering, cached_property
 
 from Player import Player
 
@@ -95,10 +95,15 @@ class Checker:
         return f"Checker({self.player.short_str} @ {self.position.name})"
     
     def __eq__(self, other: 'Checker'):
-        return self.player == other.player and self.position == other.position
-    
+        return self.hash_value == other.hash_value
+
+    # Because of aggressive caching, caching the hash value itself provides a significant performance boost
     def __hash__(self):
-        return hash((self.player, self.position))
+        return self.hash_value
+
+    @cached_property
+    def hash_value(self):
+        return (self.position << 2) + self.player.int_value
     
     def __lt__(self, other: 'Checker'):
         if self.position != other.position:
