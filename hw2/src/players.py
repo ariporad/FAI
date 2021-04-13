@@ -196,14 +196,14 @@ class KnowledgePlayerAlgorithm(PlayerAlgorithm):
         total = 0
 
         if move.captured is not None:
-            total += 10 * self.position_score(
+            total += 1.5 * self.position_score(
                 move.captured.position.swap(move.board.config.board_size),
                 move.board.config.board_size
             )
 
         if move.to == Checker.Position('GOAL'):
             spots_moved = move.board.config.board_size - move.checker.position
-            total += 10 * (spots_moved - roll)
+            total += 3 * (spots_moved - roll)
 
         return total
 
@@ -212,9 +212,9 @@ class KnowledgePlayerAlgorithm(PlayerAlgorithm):
         WARNING: Make sure the position is from the right perspective before calling this method.
         """
         if position == Checker.Position('GOAL'):
-            return 10
+            return 11
         # position, but scaled so HOME = 0 and GOAL - 1 = 5
-        return (5 / board_size) * float(position)
+        return (10 / board_size) * float(position)
 
     def board_score(self, board: Board, player: Player) -> float:
         """
