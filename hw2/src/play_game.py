@@ -38,13 +38,16 @@ def play_game(black_player: PlayerAlgorithm, white_player: PlayerAlgorithm,
         legal_moves = turn.board.legal_moves(roll)
         is_first_turn = False
 
-        if len(legal_moves) == 0:
+        num_moves = len(legal_moves)
+        if num_moves == 0:
             if not silent:
                 print(f"{turn.player.long_str} ({player.name}) rolled {roll}, but couldn't make any moves! SKIPPED!")
             turn = Turn(turn.board, player=turn.player.swapped, dicestream=turn.dicestream)
             continue
-
-        move = player.play(legal_moves, roll)
+        elif num_moves == 1:
+            move = legal_moves[0]
+        else:
+            move = player.play(legal_moves, roll)
 
         if not silent and not player.force_silent:
             print(f"{turn.player.long_str} ({player.name}) rolled {roll} and played:")

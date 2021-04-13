@@ -2,7 +2,7 @@ from typing import *
 from random import choice
 
 from helpers import *
-from main import Move, Player
+from main import Move, Player, Board, Checker
 
 
 class PlayerAlgorithm:
@@ -41,9 +41,9 @@ class PlayerAlgorithm:
 
         For a shortcut to implementing this for many use cases, see rank().
         """
-        return sorted(moves, key=lambda m: self.rank(m), reverse=True)[0]
+        return sorted(moves, key=lambda m: self.rank(m, roll), reverse=True)[0]
 
-    def rank(self, move: Move) -> int:
+    def rank(self, move: Move, roll: int) -> float:
         """
         Many algorithms simply calculate a numerical value for each move and pick the move with the highest (or lowest)
         value. For those, they can simply implement rank(move), and PlayerAlgorithm will provide a play implementation.
@@ -53,6 +53,7 @@ class PlayerAlgorithm:
         """
         raise NotImplementedError("Abstract method: do not use PlayerAlgorithm directly!")
 
+    # These getters can be overwritten with normal properties
     @property
     def name(self) -> str:
         """
@@ -108,7 +109,8 @@ class FirstPlayerAlgorithm(PlayerAlgorithm):
     """
     name = "first"
 
-    def rank(self, move: Move) -> int:
+    def rank(self, move: Move, roll: int) -> float:
+        # Always pick the move with the checker with the greatest (closest to goal) position.
         return move.checker.position
 
 
@@ -119,7 +121,8 @@ class LastPlayerAlgorithm(PlayerAlgorithm):
     """
     name = "last"
 
-    def rank(self, move: Move) -> int:
+    def rank(self, move: Move, roll: int) -> float:
+        # Always pick the move with the lowest (closest to home) position.
         return -move.checker.position
 
 
@@ -129,7 +132,95 @@ class ScorePlayerAlgorithm(PlayerAlgorithm):
     """
     name = "score"
 
-    def rank(self, move: Move) -> int:
+    def rank(self, move: Move, roll: int) -> float:
         player = move.player
-        return move.executed.score(player) - move.executed.score(player.swapped)
+        return self.score(move.executed, player) - self.score(move.executed, player.swapped)
+
+    def score(self, board: Board, player: Player):
+        """
+        Return player's score, which is the sum of the position of all the checkers (where home is 0pts, the board is
+        1...board_size pts, and the goal is board_size + 1 pts).
+        """
+        board = board.from_perspective(player)
+
+        total = 0
+        for checker in board.checkers:
+            if checker.player != player:
+                continue
+
+            if checker.position == Checker.Position('HOME'):
+                # Home is 0 points
+                continue
+            elif checker.position == Checker.Position('GOAL'):
+                total += board.config.board_size + 1
+            else:
+                total += checker.position + 1
+
+        return total
+
+
+
+class KnowledgePlayerAlgorithm(PlayerAlgorithm):
+    """
+    A Nannon player based on my intuition.
+    """
+    name = "knowledge"
+
+    def rank(self, move: Move, roll: int) -> float:
+        """
+        Some thoughts:
+        - If you roll a 5 or 6, moving a piece all the way to the goal is very valuable
+            - Supporting evidence: FirstPlayerAlgorithm is worse than random (random wins ~53% of the time)
+        - Knocking off opponent's pieces is valuable, especially if they're near the goal
+        - Primes are medium-valuable
+        - LastPlayerAlgorithm and ScorePlayerAlgorithm are pretty similar in terms of performance (SPA is ~3% better)
+            - This makes sense if you think about the fact that SPA is basically LPA but favoring knocking off
+        - Having lots of pieces at the start of your board can trap you in
+
+        Things that didn't work:
+        - Non-linear position scores (checkers closer to the goal are *way* more valuable)
+        - A lot of checkers (of either color) right near home is bad because you're likely to be trapped
+        - Optimizing for number of legal moves after this one (not taking into account other player's turn)
+        - Optimizing for number of open positions
+
+        Minimaxing has very little (~1%) improvement, interestingly.
+        """
+        own_board_score = self.board_score(move.executed, move.player)
+        other_board_score = self.board_score(move.executed, move.player.swapped)
+        move_score = self.move_score(roll, move)
+
+        return (own_board_score - other_board_score) + move_score
+
+    def move_score(self, roll: int, move: Move) -> float:
+        total = 0
+
+        if move.captured is not None:
+            total += 10 * self.position_score(
+                move.captured.position.swap(move.board.config.board_size),
+                move.board.config.board_size
+            )
+
+        if move.to == Checker.Position('GOAL'):
+            spots_moved = move.board.config.board_size - move.checker.position
+            total += 10 * (spots_moved - roll)
+
+        return total
+
+    def position_score(self, position: Checker.Position, board_size: int):
+        """
+        WARNING: Make sure the position is from the right perspective before calling this method.
+        """
+        if position == Checker.Position('GOAL'):
+            return 10
+        # position, but scaled so HOME = 0 and GOAL - 1 = 5
+        return (5 / board_size) * float(position)
+
+    def board_score(self, board: Board, player: Player) -> float:
+        """
+        Return player's score, which is the sum of the position of all the checkers (where home is 0pts, the board is
+        1...board_size pts, and the goal is board_size + 1 pts).
+        """
+        board = board.from_perspective(player)
+
+        return sum(self.position_score(checker.position, board.config.board_size) for checker in board.checkers if checker.player == player)
 

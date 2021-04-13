@@ -69,6 +69,9 @@ class Checker:
         @property
         def is_concrete(self) -> bool:
             return self != Checker.Position.HOME_VALUE and self != Checker.Position.GOAL_VALUE
+
+        def swap(self, board_size: int) -> 'Checker.Position':
+            return Checker.Position(board_size - 1 - self)
     
         @property
         def name(self) -> str:
