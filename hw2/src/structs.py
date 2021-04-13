@@ -36,6 +36,10 @@ class Player(Enum):
     def int_value(self):
         return 1 if self == Player.BLACK else 2
 
+    @cached_property
+    def display_symbol(self) -> str:
+        return '○' if self == Player.WHITE else '●'
+
     def __repr__(self):
         return "Player.BLACK" if self == Player.BLACK else "Player.WHITE"
 
@@ -165,7 +169,3 @@ class Checker:
             return self.position < other.position
         else:
             return self.player == Player.BLACK
-
-    @property
-    def display_symbol(self) -> str:
-        return '○' if self.player == Player.BLACK else '●'

@@ -50,6 +50,7 @@ def main():
     if args.mode in ['g', 'game']:
         play_game(players[0], players[1], seed=args.seed, config=config)
     elif args.mode in ['t', 'tournament']:
+        # Play tournament has better UI if we're only doing two players
         if len(players) == 2:
             play_tournament(players[0], players[1], rounds=args.rounds, seed=args.seed, config=config)
         else:

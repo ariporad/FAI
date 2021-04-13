@@ -10,6 +10,9 @@ from Dicestream import Dicestream
 def play_game(black_player: PlayerAlgorithm, white_player: PlayerAlgorithm,
               dicestream: Dicestream = None, rolls: List[int] = None, seed: int = None,
               config: GameConfiguration = GameConfiguration(), silent=False) -> Player:
+    """
+    Play one game of Nannon
+    """
     if dicestream is None:
         if rolls is not None:
             dicestream = Dicestream.fixed(rolls)
@@ -25,6 +28,7 @@ def play_game(black_player: PlayerAlgorithm, white_player: PlayerAlgorithm,
     if not silent:
         print(f"Playing a Game of Nannon{config}! Black: {black_player.name}, White: {white_player.name}. Seed = {seed}")
 
+    # Handle the first roll and picking who goes first
     starting_roll = dicestream.first_roll()
     starting_player = Player.BLACK
     if starting_roll < 0:
@@ -64,7 +68,3 @@ def play_game(black_player: PlayerAlgorithm, white_player: PlayerAlgorithm,
         print(f"Winner: {board.whowon.long_str} ({(black_player if board.whowon == Player.BLACK else white_player).name})! ")
     
     return board.whowon
-    
-    
-if __name__ == '__main__':
-    play_game(HumanPlayerAlgorithm(), RandomPlayerAlgorithm())

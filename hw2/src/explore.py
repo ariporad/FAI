@@ -7,7 +7,7 @@ from Board import Board
 
 def explore(config: GameConfiguration = GameConfiguration()):
     """
-    Return all possible turns for a game of Nannon.
+    Return all possible boards for a game of Nannon.
     
     No tests because they're too slow.
     """
@@ -32,9 +32,10 @@ def explore(config: GameConfiguration = GameConfiguration()):
 
     # Now explore every other board
     for board in to_explore:  # this will continue iterating on states that we add inside the loop
-        if board not in children:
+        if board not in children:  # only explore new states
             children[board] = []
             for roll in range(1, config.die_size + 1):
+                # make sure to check both perspectives
                 children[board] += [move.executed for move in board.legal_moves(roll)]
                 children[board] += [move.executed.from_perspective(Player.BLACK) for move in board.swapped.legal_moves(roll)]
             all_boards += [board]

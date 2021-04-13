@@ -35,14 +35,15 @@ def bulk_tournament(players: List[PlayerAlgorithm] = PlayerAlgorithm.all(), roun
         advantages[black_player][white_player] = advantage
         advantages[white_player][black_player] = 1 - advantage
 
-    col_order = sorted(players, key=lambda p: p.name)
-    maxlen = max([len('Loser →')] + [len(player.name) for player in col_order])
-
-    format_row = lambda items: ' | '.join(str(n).ljust(maxlen) for n in items)
-
-    title_row = format_row(['Loser →'] + [player.name for player in col_order])
-
+    # Print out a nice table of results
     if not silent:
+        col_order = sorted(players, key=lambda p: p.name)
+        maxlen = max([len('Loser →')] + [len(player.name) for player in col_order])
+
+        format_row = lambda items: ' | '.join(str(n).ljust(maxlen) for n in items)
+
+        title_row = format_row(['Loser →'] + [player.name for player in col_order])
+
         progress.stop(f"Played {num_pairings} tournaments of {rounds} games each.")
         print(title_row)
         print('-' * len(title_row))
@@ -51,7 +52,3 @@ def bulk_tournament(players: List[PlayerAlgorithm] = PlayerAlgorithm.all(), roun
             print(format_row([row_player.name] + values))
 
     return advantages
-
-
-if __name__ == '__main__':
-    play_tournament(RandomPlayerAlgorithm(), RandomPlayerAlgorithm())

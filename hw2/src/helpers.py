@@ -20,6 +20,9 @@ def print_each(iterable: Iterable[T], stringify=str, key=None):
 
 
 def only(iterable: Iterable[T], message: Union[str, Exception] = "list expected to have length 1") -> Optional[T]:
+    """
+    Assert that iterable has no more than one item, and return that item if it exists.
+    """
     lst = list(iterable)
     assert len(lst) <= 1, message
     return lst[0] if len(lst) == 1 else None
@@ -124,9 +127,16 @@ class ProgressBar:
             
 
 def all_subclasses(cls):
+    """
+    Return all subclasses, recursively, of a class.
+    """
+
     subclasses = cls.__subclasses__()
     return set(subclasses).union([subsub for sub in subclasses for subsub in all_subclasses(sub)])
 
 
 def random_seed():
+    """
+    Return a seed for a random number generator.
+    """
     return round(system_time())

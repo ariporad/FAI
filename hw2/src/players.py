@@ -160,31 +160,21 @@ class ScorePlayerAlgorithm(PlayerAlgorithm):
         return total
 
 
-
 class KnowledgePlayerAlgorithm(PlayerAlgorithm):
     """
-    A Nannon player based on my intuition.
+    A Nannon player based on my intuition. It does a minimax of its score and the opponent's score, with additional
+    consideration about the move itself. Its guiding principles are:
+    - Checkers closer to the goal are better. (Similarly to, but weighted differently than, ScorePlayerAlgorithm)
+    - Knocking off an opponent's checker is valuable, proportionally to how close it is to its goal
+    - Using a roll of 6 to move a checker that's 1 away from the goal is a waste
+
+    Those principles are combined with weights derived from experimentation to build the algorithm.
     """
     name = "knowledge"
 
     def rank(self, move: Move, roll: int) -> float:
         """
-        Some thoughts:
-        - If you roll a 5 or 6, moving a piece all the way to the goal is very valuable
-            - Supporting evidence: FirstPlayerAlgorithm is worse than random (random wins ~53% of the time)
-        - Knocking off opponent's pieces is valuable, especially if they're near the goal
-        - Primes are medium-valuable
-        - LastPlayerAlgorithm and ScorePlayerAlgorithm are pretty similar in terms of performance (SPA is ~3% better)
-            - This makes sense if you think about the fact that SPA is basically LPA but favoring knocking off
-        - Having lots of pieces at the start of your board can trap you in
-
-        Things that didn't work:
-        - Non-linear position scores (checkers closer to the goal are *way* more valuable)
-        - A lot of checkers (of either color) right near home is bad because you're likely to be trapped
-        - Optimizing for number of legal moves after this one (not taking into account other player's turn)
-        - Optimizing for number of open positions
-
-        Minimaxing has very little (~1%) improvement, interestingly.
+        Return the overall score of the move, which is composed of both the move score and board score.
         """
         own_board_score = self.board_score(move.executed, move.player)
         other_board_score = self.board_score(move.executed, move.player.swapped)
@@ -193,6 +183,10 @@ class KnowledgePlayerAlgorithm(PlayerAlgorithm):
         return (own_board_score - other_board_score) + move_score
 
     def move_score(self, roll: int, move: Move) -> float:
+        """
+        Return the score of the move itself, which takes into account captures and fully using the dice roll. This is
+        only part of the move's overall score.
+        """
         total = 0
 
         if move.captured is not None:
@@ -209,17 +203,20 @@ class KnowledgePlayerAlgorithm(PlayerAlgorithm):
 
     def position_score(self, position: Checker.Position, board_size: int):
         """
+        Return the score of a checker at position.
+
         WARNING: Make sure the position is from the right perspective before calling this method.
         """
+        # We can't just use the board position like ScorePlayerAlgorithm, because we need to be able to weight it for
+        # all possible board sizes. Therefore, we scale it from 0-10, with the goal as 11.
         if position == Checker.Position('GOAL'):
             return 11
-        # position, but scaled so HOME = 0 and GOAL - 1 = 5
         return (10 / board_size) * float(position)
 
     def board_score(self, board: Board, player: Player) -> float:
         """
-        Return player's score, which is the sum of the position of all the checkers (where home is 0pts, the board is
-        1...board_size pts, and the goal is board_size + 1 pts).
+        Return board score, which is the sum of all the checker position scores. This is only part of a move's overall
+        score.
         """
         board = board.from_perspective(player)
 

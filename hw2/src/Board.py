@@ -97,12 +97,12 @@ class BoardDescription(NamedTuple):
 @dataclass(frozen=True)
 class Move:
     """
-    A data class representing a move that can be made from a given turn. `checker` is a member of `turn.checker` (which,
-    since Checkers are immutable, means it hasn't moved yet), and `to` is defined relative to `turn` (including the
-    perspective.)
+    A data class representing a move that can be made from a given Board. `checker` is a member of `board.checkers`
+    (which, since Checkers are immutable, means it hasn't moved yet), and `to` is defined relative to `board` (including
+    the perspective.)
 
-    NOTE: Since Moves, Checkers, and Positions are all immutable, this class represents a possible but not-yet-executed
-    move. The board that results from making this move can be calculated with Move.executed.
+    NOTE: Since Moves, Checkers, Boards, and Positions are all immutable, this class represents a possible but
+    not-yet-executed move. The board that results from making this move can be calculated with Move.executed.
     """
     board: 'Board'
     checker: Checker
@@ -126,6 +126,9 @@ class Move:
         return Move(board, checker, to_idx)
 
     def draw(self, perspective: Player = None) -> str:
+        """
+        Wrapper around board.draw that also displays the former position of the checker.
+        """
         board = self.executed
         checker = self.checker
         if perspective is not None:
@@ -136,6 +139,10 @@ class Move:
 
     @cached_property
     def captured(self) -> Optional[Checker]:
+        """
+        The checker that will be captured/knocked off/sent back to home by this move, if any. Always belongs to the
+        opponent.
+        """
         return only(checker for checker in self.board.checkers if
                     (self.to.is_concrete and checker.position == self.to and checker.player != self.player))
 
@@ -172,17 +179,17 @@ class Move:
 
 class Board:
     """
-    A dataclass representing a turn of the game. Completely immutable.
+    A class representing the state of the board at a given point. Immutable.
 
-    Any given turn can be seen from either player's perspective, irrespective of if it is that
-    player's turn.
+    Any given turn can be seen from either player's perspective, irrespective of if it is that player's turn. This class
+    does not track which player's turn it is.
     """
 
     perspective: Player
     """ From who's perspective are we looking at the board? """
 
     checkers: List[Checker]
-    """ All checker is play. Always a list of length 2 * checkers_per_player """
+    """ All checkers in play. Always a list of length 2 * checkers_per_player """
 
     config: GameConfiguration
     """ The configuration representing the variant of Nannon we're playing. """
@@ -219,39 +226,38 @@ class Board:
         """
         Return a string with a human-readable view of the board.
 
-        If ghost_checkers is provided, those checkers will be rendered greyed-out.
+        If ghost_checkers is provided, those checkers will be rendered greyed-out. See Move.draw().
 
-        >>> print(Board(perspective=Player.BLACK, board=('BBBWWW', '-B--W-', 'BW'), config=GameConfiguration(6, 5, 6)).draw())
-                     Black →
+        >>> print(Board(perspective=Player.WHITE, board=('BBBWWW', '-W--B-', 'BW'), config=GameConfiguration(6, 5, 6)).draw())
+                     ○ White →
         Goal → ●     |  ▼  ▼  ▼  ▼  ▼  ▼  |     ○ ← Goal
                      |     ○        ●     |
         Home → ○○○   |  ▲  ▲  ▲  ▲  ▲  ▲  |   ●●● ← Home
-                                    ← White
-        >>> print(Board(perspective=Player.BLACK, board=('BBBBBWWWWW', '------', ''), config=GameConfiguration(6, 5, 6)).draw())
-                     Black →
+                                  ← Black ●
+        >>> print(Board(perspective=Player.WHITE, board=('BBBBBWWWWW', '------', ''), config=GameConfiguration(6, 5, 6)).draw())
+                     ○ White →
         Goal →       |  ▼  ▼  ▼  ▼  ▼  ▼  |       ← Goal
                      |                    |
         Home → ○○○○○ |  ▲  ▲  ▲  ▲  ▲  ▲  | ●●●●● ← Home
-                                    ← White
-        >>> print(Board(perspective=Player.BLACK, board=('', '------', 'BBBBBWWWWW'), config=GameConfiguration(6, 5, 6)).draw())
-                     Black →
+                                  ← Black ●
+        >>> print(Board(perspective=Player.WHITE, board=('', '------', 'BBBBBWWWWW'), config=GameConfiguration(6, 5, 6)).draw())
+                     ○ White →
         Goal → ●●●●● |  ▼  ▼  ▼  ▼  ▼  ▼  | ○○○○○ ← Goal
                      |                    |
         Home →       |  ▲  ▲  ▲  ▲  ▲  ▲  |       ← Home
-                                    ← White
-        >>> print(Board(perspective=Player.BLACK, board=('BW', 'WBWBWB', 'BW'), config=GameConfiguration(6, 5, 6)).draw())
-                     Black →
+                                  ← Black ●
+        >>> print(Board(perspective=Player.WHITE, board=('BW', 'BWBWBW', 'BW'), config=GameConfiguration(6, 5, 6)).draw())
+                     ○ White →
         Goal → ●     |  ▼  ▼  ▼  ▼  ▼  ▼  |     ○ ← Goal
                      |  ●  ○  ●  ○  ●  ○  |
         Home → ○     |  ▲  ▲  ▲  ▲  ▲  ▲  |     ● ← Home
-                                    ← White
-
-        >>> print(Board(perspective=Player.WHITE, board=('BW', 'WBWBWB', 'BW'), config=GameConfiguration(6, 5, 6)).draw())
-                     White →
+                                  ← Black ●
+        >>> print(Board(perspective=Player.BLACK, board=('BW', 'BWBWBW', 'BW'), config=GameConfiguration(6, 5, 6)).draw())
+                     ● Black →
         Goal → ○     |  ▼  ▼  ▼  ▼  ▼  ▼  |     ● ← Goal
                      |  ●  ○  ●  ○  ●  ○  |
         Home → ●     |  ▲  ▲  ▲  ▲  ▲  ▲  |     ○ ← Home
-                                    ← Black
+                                  ← White ○
         """
         # Checkers are represented by tuples of the form (is_ghost, Checker)
         checkers = [(True, checker) for checker in ghost_checkers] + [(False, checker) for checker in self.checkers]
@@ -267,9 +273,9 @@ class Board:
             if checker is None:
                 return ' '
             elif checker[0]:  # if ghost checker
-                return '-'  # f"\u001b[38;5;241m{checker[1].display_symbol}\u001b[0m"
+                return '-'
             else:
-                return checker[1].display_symbol
+                return checker[1].player.display_symbol
 
         board_checkers = '|  ' + '  '.join(render(checker) for checker in board) + '  |'
 
@@ -299,18 +305,12 @@ class Board:
         mid_line = ((' ' * len(left_bottom)) + board_checkers)
 
         return "\n".join([
-            (' ' * len(left_top)) + self.perspective.long_str + ' →',
+            (' ' * len(left_top)) + self.perspective.display_symbol + ' ' + self.perspective.long_str + ' →',
             top_line,
             mid_line,
             bottom_line,
-            ('← ' + self.perspective.swapped.long_str).rjust(line_len - len(right_bottom), ' ')
+            ('← ' + self.perspective.swapped.long_str + ' ' + self.perspective.swapped.display_symbol).rjust(line_len - len(right_bottom), ' ')
         ])
-
-    def print(self):
-        """
-        Print the output of draw()
-        """
-        print(self.draw())
 
     def __str__(self):
         home, board, goal = BoardDescription.from_checkers(self.checkers, config=self.config)
@@ -326,8 +326,8 @@ class Board:
     @cached_property
     def swapped(self):
         """
-        Return the same game, but from the other player's perspective. This allows most logic to only be written for one
-        player.
+        Return the same game, but from the other player's perspective. This allows most logic to only be written for
+        only one player.
 
         >>> print(Board(perspective=Player.BLACK, board=('BW', '-B--W-', 'BW')).swapped)
         Board{6,3,6}(W: BW [-W--B-] BW)
@@ -339,9 +339,15 @@ class Board:
         return Board(perspective=self.perspective.swapped, checkers=checkers, config=self.config)
 
     def from_perspective(self, perspective: Player):
+        """
+        Return the board from a specific perspective, irrespective of its current perspective.
+        """
         return self if self.perspective == perspective else self.swapped
 
     def is_winner(self, player: Player = None) -> bool:
+        """
+        Did player win the game? See whowon.
+        """
         if player is None:
             player = self.perspective
 
@@ -379,7 +385,7 @@ class Board:
 
         NOTE: This method does not take into account if the player has the checker to move, nor if it's their turn.
 
-        _Tested via open_positions._
+        Tested via open_positions.
         """
         if player is None:
             player = self.perspective
@@ -460,16 +466,6 @@ class Board:
         Move(W: 2 -> 3)
         Move(W: 4 -> 5)
         """
-        # (LEGALMOVES POS ROLL) returns the position that player1 can move from with the current roll. This may be a
-        # list of 0(nil), 1, 2 or 3 values indicating the board positions of player1's checkers. You might make a module
-        # first which determines where player1 can land on the board (i.e. not on player 1 checkers or player 2 checkers
-        # next to each other)
-        #
-        # Players start checkers at opposite ends of the board, take turns rolling one die, and, if possible, MUST move
-        # one checker forward the number of steps given, or off the board. To determine who goes first, both players
-        # roll their dice, and the winner gets the difference between the rolls (in case of tie, roll again). A checker
-        # cannot legally land on another checker of the same color, nor on any of the opponent which are protected by an
-        # adjacent checker on the board. Landing on a singleton opponent checker hits it back off the board.
 
         if player is None:
             player = self.perspective
@@ -512,7 +508,7 @@ class Board:
     @cache
     def create_starting_board(cls, config: GameConfiguration = GameConfiguration(), perspective: Player = Player.BLACK):
         """
-        Create a starting board for config.
+        Create a starting board (ie. the board before the first turn) for config.
 
         >>> print(Board.create_starting_board())
         Board{6,3,6}(B: BW [BB--WW] -)

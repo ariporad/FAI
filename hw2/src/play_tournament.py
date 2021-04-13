@@ -33,7 +33,3 @@ def play_tournament(player1: PlayerAlgorithm, player2: PlayerAlgorithm, rounds: 
         progress.stop(f"Played {rounds} games {player1.name} vs {player2.name}: {player1.name} won {wins} ({round(100 * wins / rounds, 2)}%).")
     
     return wins / rounds
-    
-    
-if __name__ == '__main__':
-    play_tournament(RandomPlayerAlgorithm(), RandomPlayerAlgorithm())
