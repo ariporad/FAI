@@ -1,8 +1,8 @@
+from typing import *
 from random import choice
-from functools import cache
 
 from helpers import *
-from structs import Player,Checker
+from structs import *
 from Board import Board, Move
 
 
@@ -137,7 +137,6 @@ class ScorePlayerAlgorithm(PlayerAlgorithm):
         player = move.player
         return self.score(move.executed, player) - self.score(move.executed, player.swapped)
 
-    @cache
     def score(self, board: Board, player: Player):
         """
         Return player's score, which is the sum of the position of all the checkers (where home is 0pts, the board is
@@ -168,7 +167,6 @@ class KnowledgePlayerAlgorithm(PlayerAlgorithm):
     """
     name = "knowledge"
 
-    @cache
     def rank(self, move: Move, roll: int) -> float:
         """
         Some thoughts:
