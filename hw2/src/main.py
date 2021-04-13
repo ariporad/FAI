@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
-from collections import namedtuple
+from functools import cached_property, cache
 
 from Checker import *
 from Dicestream import *
 from helpers import *
-
-
-# Question: a number of my functions don't have the same names as the ones perscribed. Is that OK?
 
 
 class GameConfiguration(NamedTuple):
@@ -43,7 +40,8 @@ class BoardDescription(NamedTuple):
     home: str
     board: str
     goal: str
-    
+
+    @cache
     def __eq__(self, other):
         # Using numerical indexes to allow comparing against normal tuples
         return isinstance(other, tuple) and sorted(self[0]) == sorted(other[0]) and self[1] == other[1] and sorted(
@@ -53,6 +51,7 @@ class BoardDescription(NamedTuple):
         return not (self == other)
     
     @classmethod
+    @cache
     def from_checkers(cls, checkers: List[Checker], config: GameConfiguration = GameConfiguration()):
         """
         Convert from a list of Checkers to a BoardDescription.
@@ -79,7 +78,7 @@ class BoardDescription(NamedTuple):
         
         return cls(home, ''.join(board), goal)
     
-    @property
+    @cached_property
     def checkers(self) -> List[Checker]:
         """
         Convert this BoardDescription to a list of Checkers.
@@ -169,11 +168,11 @@ class Move:
             checker = checker if not checker.position.is_concrete or self.board.perspective == perspective else Checker(checker.player, self.board.config.board_size - 1 - checker.position)
         return board.draw([checker])
 
-    @property
+    @cached_property
     def captured(self) -> Optional[Checker]:
         return only(checker for checker in self.board.checkers if (self.to.is_concrete and checker.position == self.to and checker.player != self.player))
 
-    @property
+    @cached_property
     def executed(self) -> 'Board':
         """
         Return the resulting board after this move has been executed.
@@ -247,7 +246,7 @@ class Board:
         self.perspective = perspective
         self.checkers = sorted(checkers)
         self.config = config
-    
+
     def draw(self, ghost_checkers: List[Checker] = []) -> str:
         """
         Return a string with a human-readable view of the board.
@@ -356,7 +355,7 @@ class Board:
     def __hash__(self):
         return hash((self.perspective, self.config, tuple(self.checkers)))
     
-    @property
+    @cached_property
     def swapped(self):
         """
         Return the same game, but from the other player's perspective. This allows most logic to only be written for one
@@ -382,7 +381,7 @@ class Board:
             checker.position == Checker.Position('GOAL') for checker in self.checkers if checker.player == player
         )
 
-    @property
+    @cached_property
     def whowon(self) -> Optional[Player]:
         """
         Return the winner, or None if there is no winner.
@@ -404,7 +403,8 @@ class Board:
             return Player.WHITE
         else:
             return None
-    
+
+    @cache
     def is_open(self, position: Checker.Position, player: Player = None) -> bool:
         """
         Check if the perspective's player _could_ move a checker to the given position, if they had a suitable roll.
@@ -440,7 +440,7 @@ class Board:
                         return False
         return True
     
-    @property
+    @cached_property
     def open_positions(self, player: Player = None) -> Iterator[Checker.Position]:
         """
         Return all the positions that the player (or the perspective's player) could move to, if they had the right roll.
@@ -471,6 +471,7 @@ class Board:
             if self.is_open(position, player):
                 yield position
 
+    @cache
     def legal_moves(self, roll: int, player: Player = None) -> List[Move]:
         """
         Returns all legal moves for the player (or the perspective player) from the current state.
@@ -537,6 +538,7 @@ class Board:
         return moves
 
     @classmethod
+    @cache
     def create_starting_board(cls, config: GameConfiguration = GameConfiguration(), perspective: Player = Player.BLACK):
         """
         Create a starting board for config.
@@ -636,10 +638,11 @@ class Turn:
     def __hash__(self):
         return hash((self.board, self.player))
     
-    @property
+    @cached_property
     def is_winner(self) -> bool:
         return self.board.is_winner(self.player)
-    
+
+    @cache
     def make(self, move: Move) -> 'Turn':
         """
         Make a move and return the resulting turn.

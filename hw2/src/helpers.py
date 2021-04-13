@@ -5,7 +5,7 @@ T = TypeVar('T')
 
 
 def count(predicate: Callable[[T], bool], iterable: Iterable[Optional[T]]) -> int:
-    return len(filter(predicate, iterable))
+    return len(list(filter(predicate, iterable)))
 
 
 def is_unique(iterable: Iterable[T]) -> bool:

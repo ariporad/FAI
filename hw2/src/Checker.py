@@ -4,6 +4,7 @@ from functools import total_ordering
 
 from Player import Player
 
+
 @dataclass
 @total_ordering
 class Checker:
