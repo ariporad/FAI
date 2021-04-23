@@ -1,0 +1,23 @@
+[train]
+epsilon = 0.05
+decay = 1.0
+gamma = 0.99
+update_target_freq = 100
+max_buffer_size = 50000
+learning_rate = 0.0005
+batch_size = 128
+max_episode_length = 1000
+update_after_step = 4
+eval_episodes = 10
+total_training_episodes = 7500
+use_pipes = yes
+checkpoint_freq = 50
+
+[files]
+root_dir = records/pipes/
+episode_states_dir = records/pipes/episode_states/
+backup_weights_path = records/pipes/backup_weights/weights
+best_weights_path = records/pipes/best_weights/weights
+log_path = records/pipes/log.csv
+best_episode_states_path = records/pipes/episode_states/best.p
+held_out_states_path = records/pipes/episode_states/held_out.p

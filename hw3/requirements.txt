@@ -1,0 +1,3 @@
+termcolor
+pandas
+tensorflow
