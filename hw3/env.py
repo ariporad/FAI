@@ -1,59 +1,54 @@
 from typing import *
 
-from math import ceil, floor
+from math import floor
+from collections import deque
 from dataclasses import dataclass
-from random import Random
+from random import randrange
 
 import numpy as np
 
-FRAME_WIDTH = 50
-FRAME_HEIGHT = 50
-BORDER_HEIGHT = 2
+from config import *
 
-PIPE_WIDTH = 7
-PIPE_VERTICAL_GAP = 20
-PIPE_HORIZONTAL_GAP = 22
-TOP_PIPE_MIN_HEIGHT = 5
-TOP_PIPE_MAX_HEIGHT = 25
-
-BIRD_WIDTH = 5
-BIRD_HEIGHT = 5
-
-PIPE_VALUE = 1
-BIRD_VALUE = 2
-
-FRAMES_PER_OBSERVATION = 4
-
-
-# For all coordinate systems, the origin is the upper left
+# NOTE: for all coordinate systems, the origin is the upper left
 
 @dataclass
-class State:
-    prev: Optional['State']
+class Frame:
     """
-    The state that proceeded this one.
+    One frame of the game. Immutable.
     """
     
     pipes: List[Tuple[int, int]]
     """
     List of all pipes.
     
-    Each pipe is represented by the x-position of its leftmost edge and the height of the top pipe.
+    Each pipe is represented by a tuple with  the x-position of its left edge and the height of the top half (in that
+    order).
     """
     
     bird_height: int
     """
-    The y-coordinate of the top edge of the bird. (The bird's x-coordinate is always centered)
+    The y-coordinate of the top edge of the bird. (The bird's x-coordinate is always centered.)
     """
     
     bird_velocity: int
     """
-    The y velocity of the bird, in pixels per frame. Increments by 2 each frame. Reset to -5 when screen is tapped.
+    The y velocity of the bird, in pixels per frame. Increments by BIRD_ACCELERATION each frame. Reset to
+    BIRD_TAP_VELOCITY when screen is tapped.
     
-    NOTE: Weird signage is because higher y values are visually lower
+    NOTE: Weird signage is because higher y values are visually lower.
     """
 
     def next(self, tap, get_pipe_height):
+        """
+        Generate the frame that succeeds this one.
+        
+        NOTE: This does *not* check for if the game has ended/the bird has crashed. This means it's possible to produce
+              illegal states if you just keep calling next().
+        
+        :param tap: Was the screen tapped? If so, the bird's velocity will reset, otherwise it will decrease.
+        :param get_pipe_height: A function which randomly generates the height of the next pipe. Only called when a new
+                                pipe is created.
+        """
         new_pipes = []
         
         for left_x, top_height in self.pipes:
@@ -64,16 +59,45 @@ class State:
             
             new_pipes.append((left_x - 1, top_height))
         
-        velocity = -5 if tap else (self.bird_velocity + 2)
+        velocity = BIRD_TAP_VELOCITY if tap else (self.bird_velocity + BIRD_ACCELERATION)
         
-        return State(prev=self, pipes=new_pipes, bird_height=(self.bird_height + self.bird_velocity), bird_velocity=velocity)
-
-    @property
-    def done(self):
-        pass
+        return Frame(pipes=new_pipes, bird_height=(self.bird_height + self.bird_velocity), bird_velocity=velocity)
     
     @property
-    def frame(self):
+    def done(self):
+        """
+        Is the game over? Returns true if the bird has hit a pipe (or a wall).
+        
+        NOTE: This function only detects if the bird died _on this frame_. If you ignore the value of this function and
+              keep calling .next(), subsequent states' .done will be False.
+        """
+        return self.reward == CRASH_REWARD
+
+    @property
+    def reward(self):
+        """
+        The neural network's reward for this frame. CRASH_REWARD if the bird hit a pipe on this frame, CLEAR_REWARD if
+        the bird just cleared a pipe on this frame, and DEFAULT_REWARD otherwise.
+        """
+        for left_x, top_height in self.pipes:
+            right_x = left_x + PIPE_WIDTH
+            overlaps_x = left_x <= BIRD_RIGHT_X and right_x >= BIRD_LEFT_X
+            hit_top_y = self.bird_height <= (BORDER_HEIGHT + top_height)
+            hit_bottom_y = (self.bird_height + BIRD_HEIGHT) >= (BORDER_HEIGHT + top_height + PIPE_VERTICAL_GAP)
+            
+            if overlaps_x and (hit_top_y or hit_bottom_y):  # did we crash?
+                return CRASH_REWARD
+            elif right_x + 1 == BIRD_LEFT_X:  # did we just make it past a pipe?
+                return CLEAR_REWARD
+            
+        return 0
+            
+    def draw(self):
+        """
+        Render this Frame to a 2D array of numbers representing the screen of the game.
+        
+        :returns: a NumPy array, because it has way more convenient multi-dimensional indexing than a normal List.
+        """
         frame = np.zeros((FRAME_HEIGHT, FRAME_WIDTH), dtype=np.uint8)
         
         frame[0:BORDER_HEIGHT, :] = PIPE_VALUE
@@ -85,64 +109,75 @@ class State:
             frame[0:upper_bottom_y, max(left_x, 0):min(FRAME_WIDTH - 1, left_x + PIPE_WIDTH)] = PIPE_VALUE
             frame[lower_top_y:, max(left_x, 0):min(FRAME_WIDTH - 1, left_x + PIPE_WIDTH)] = PIPE_VALUE
         
-        bird_left_x = ceil((FRAME_WIDTH - BIRD_WIDTH) / 2)
-        
-        frame[self.bird_height:(self.bird_height + BIRD_HEIGHT), bird_left_x:(bird_left_x + BIRD_WIDTH)] = BIRD_VALUE
+        frame[self.bird_height:(self.bird_height + BIRD_HEIGHT), BIRD_LEFT_X:(BIRD_LEFT_X + BIRD_WIDTH)] = BIRD_VALUE
         
         return frame
     
-    @property
-    def observation(self):
-        observation = np.empty((FRAMES_PER_OBSERVATION, FRAME_HEIGHT, FRAME_WIDTH), dtype=np.uint8)
-        cur_state = self
-        
-        for i in range(FRAMES_PER_OBSERVATION):
-            observation[i] = cur_state.frame
-            cur_state = cur_state.prev if cur_state.prev else cur_state # for the starting frame, just give it 4 times
-            
-        return observation
-        
     
-
 class FlappyEnv(object):
+    """
+    A Flappy Bird environment.
+    """
+    
     def __init__(self, use_pipes=False, deterministic=False):
+        """
+        Create a Flappy Bird environment
+        :param use_pipes: should any pipes be created/rendered?
+        :param deterministic: should the game be deterministic? If so, all pipes will have equal top and bottom lengths.
+                              Has no effect if use_pipes is False.
+        """
         self.use_pipes = use_pipes
-        self.deterministic = deterministic
-        self.state = None
-        self.random = Random(1 if deterministic else None)
+        self.frames = deque(maxlen=FRAMES_PER_OBSERVATION)
+        self.generate_pipe_height = lambda: DEFAULT_PIPE_HEIGHT if deterministic else  randrange(TOP_PIPE_MIN_HEIGHT, TOP_PIPE_MAX_HEIGHT)
         
         self.reset()
         
-    def generate_pipe_height(self):
-        return self.random.randrange(TOP_PIPE_MIN_HEIGHT, TOP_PIPE_MAX_HEIGHT)
-
     def reset(self):
-        # This should completely reset your environment and return a new, fresh observation
-        # This is like quitting and starting a new game.
-        # The observation should be a 3D list of integers of dimension 4 x 50 x 50
+        """
+        Reset the environment to its starting configuration.
+        
+        This is exactly equivalent to quitting and starting a new game.
+        
+        :returns: an observation of the freshly-reset game
+        """
+        self.frames.clear()
 
         pipes = []
-
         if self.use_pipes:
             pipes = [
                 (FRAME_HEIGHT, self.generate_pipe_height()),
                 (FRAME_HEIGHT + PIPE_WIDTH + PIPE_HORIZONTAL_GAP, self.generate_pipe_height())
             ]
-
-        self.state = State(None, pipes, floor(FRAME_HEIGHT / 2), 0)
+            
+        frame = Frame(pipes, floor(FRAME_HEIGHT / 2), 0)
         
-        return self.state.observation
+        while len(self.frames) < FRAMES_PER_OBSERVATION:
+            self.frames.append(frame)
+        
+        return self.observe()
+
+    def observe(self):
+        """
+        Generate an observation of the current state, which is a FRAMES_PER_OBSERVATION x FRAME_HEIGHT x FRAME_WIDTH
+        (usually 4x50x50) NumPy array representing the four most recent frames of the game, in chronological order.
+        """
+        assert len(self.frames) == FRAMES_PER_OBSERVATION, "sanity check failed: incorrect number of states"
+        
+        observation = np.array([frame.draw() for frame in self.frames], dtype=np.uint8)
+        
+        return observation
 
     def step(self, action):
-        # The input `action` is an integer in {0, 1} representing the action of the agent
-        # 0 is doing nothing, 1 is "tapping the screen."
-        # The observation should be a 3D list of integers of dimension 4 x 50 x 50
-        # The reward should be a scalar value in {-1.0, 0, or 1.0}
-        # done should be a boolean indicating whether the bird has crashed
-        reward = None
-        done = None
+        """
+        Advance the game by one timestep/frame, returning a new observation.
         
-        self.state = self.state.next(action, lambda: self.generate_pipe_height())
+        :param action: an integer in {0, 1} representing the action of the player, where 1 is a tap and 0 is nothing
+        :return: a tuple with (in order), an observation, the neural net's reward, and if the game is over
+        """
+        
+        new_frame = self.frames[-1].next(bool(action), self.generate_pipe_height)
+        
+        self.frames.append(new_frame)
 
-        return self.state.observation, reward, done
+        return self.observe(), new_frame.reward, new_frame.done
 
