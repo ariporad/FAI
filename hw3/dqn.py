@@ -4,6 +4,7 @@ import numpy as np
 from checkpoint import execute_checkpoint
 from env import FlappyEnv
 from tensorflow import keras
+from random import randrange, random
 
 
 def dqn(start_episode, model, model_target, log, config):
@@ -48,9 +49,15 @@ def dqn(start_episode, model, model_target, log, config):
             #    This will not take much coding work
             # 2. Use your environment's `step` method and the action produced by epsilon-greedy
             #    to generate the next state, reward, and done values
+            
+            if random() < epsilon:
+                action = randrange(0, len(q_values))
+            else:
+                action = q_values.index(max(q_values))
 
-            action = None  # You can delete this line when you are finished implementing epsilon-greedy
-            next_state, reward, done = None, None, None
+            # action = None  # You can delete this line when you are finished implementing epsilon-greedy
+            # next_state, reward, done = None, None, None
+            next_state, reward, done = env.step(action)
 
             if action is None:
                 raise Exception('You must implement the epsilon-greedy strategy')
