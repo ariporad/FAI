@@ -79,6 +79,9 @@ class Frame:
         The neural network's reward for this frame. CRASH_REWARD if the bird hit a pipe on this frame, CLEAR_REWARD if
         the bird just cleared a pipe on this frame, and DEFAULT_REWARD otherwise.
         """
+        if self.bird_height < BORDER_HEIGHT or (BIRD_HEIGHT + self.bird_height) >= (BORDER_HEIGHT + FRAME_HEIGHT):
+            return CRASH_REWARD
+        
         for left_x, top_height in self.pipes:
             right_x = left_x + PIPE_WIDTH
             overlaps_x = left_x <= BIRD_RIGHT_X and right_x >= BIRD_LEFT_X
@@ -179,5 +182,5 @@ class FlappyEnv(object):
         
         self.frames.append(new_frame)
 
-        return self.observe(), new_frame.reward, new_frame.done
+        return self.observe().tolist(), new_frame.reward, new_frame.done
 

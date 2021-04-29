@@ -50,7 +50,9 @@ def dqn(start_episode, model, model_target, log, config):
             # 2. Use your environment's `step` method and the action produced by epsilon-greedy
             #    to generate the next state, reward, and done values
             
-            if random() < epsilon:
+            rand = random()
+            # print("A: ", rand, "<", epsilon, rand < epsilon)
+            if rand < epsilon:
                 action = randrange(0, len(q_values))
             else:
                 action = q_values.index(max(q_values))
@@ -58,6 +60,8 @@ def dqn(start_episode, model, model_target, log, config):
             # action = None  # You can delete this line when you are finished implementing epsilon-greedy
             # next_state, reward, done = None, None, None
             next_state, reward, done = env.step(action)
+            
+            # print(f"B: action = {action}, reward = {reward}, done = {done}")
 
             if action is None:
                 raise Exception('You must implement the epsilon-greedy strategy')
