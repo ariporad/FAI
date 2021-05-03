@@ -9,7 +9,7 @@ batch_size = 128
 max_episode_length = 1000
 update_after_step = 4
 eval_episodes = 10
-total_training_episodes = 7500
+total_training_episodes = 500000
 use_pipes = yes
 checkpoint_freq = 50
 
