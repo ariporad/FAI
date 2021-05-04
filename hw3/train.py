@@ -4,6 +4,7 @@ import pandas as pd
 from dqn import dqn
 from net import make_conv_net
 from pathlib import Path
+from time import perf_counter
 
 
 def main(args):
@@ -36,9 +37,14 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', default='flight', help='Configuration file to use')
-    parser.add_argument('-l', '--load_backup', action='store_true', help='Load existing backup weights')
-    pargs = parser.parse_args()
-    main(pargs)
+    start = perf_counter() 
+    try:
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-c', '--config', default='flight', help='Configuration file to use')
+        parser.add_argument('-l', '--load_backup', action='store_true', help='Load existing backup weights')
+        pargs = parser.parse_args()
+        main(pargs)
+    finally:
+        duration = perf_counter() - start
+        print(f"\n\nTook {int(duration // 60)}m{int(duration % 60)}s.")
 

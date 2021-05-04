@@ -79,7 +79,7 @@ class Frame:
         The neural network's reward for this frame. CRASH_REWARD if the bird hit a pipe on this frame, CLEAR_REWARD if
         the bird just cleared a pipe on this frame, and DEFAULT_REWARD otherwise.
         """
-        if self.bird_height < BORDER_HEIGHT or (BIRD_HEIGHT + self.bird_height) >= (BORDER_HEIGHT + FRAME_HEIGHT):
+        if self.bird_height < BORDER_HEIGHT or (BIRD_HEIGHT + self.bird_height) >= (FRAME_HEIGHT - BORDER_HEIGHT - 1):
             return CRASH_REWARD
         
         for left_x, top_height in self.pipes:
@@ -93,7 +93,7 @@ class Frame:
             elif right_x + 1 == BIRD_LEFT_X:  # did we just make it past a pipe?
                 return CLEAR_REWARD
             
-        return 0
+        return DEFAULT_REWARD
             
     def draw(self):
         """

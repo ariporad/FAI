@@ -15,7 +15,7 @@ BORDER_HEIGHT = 2
 """ The height of the border along the top and bottom of the frame, in pixels. Made of the same material as pipes. """
 
 DEFAULT_PIPE_HEIGHT = 13
-""" A default pipe height to use in deterministic mode, in pixels. 13px results in vertically centered pipes. """
+""" A default pipe height to use in deterministic mode, in pixels. 13px results in vertically centered pipes. Does not include the border. """
 PIPE_WIDTH = 7
 """ The width of each pipe, in pixels. """
 PIPE_HORIZONTAL_GAP = 22
@@ -26,10 +26,10 @@ The vertical gap between the top and bottom halves of each pipe. The height of t
 shrinks) to maintain this gap with whatever the height of the top pipe is. Measured in pixels.
 """
 
-TOP_PIPE_MIN_HEIGHT = 5
-""" The minimum height of the top pipe, in pixels. """
-TOP_PIPE_MAX_HEIGHT = 25
-""" The maximum height of the top pipe, in pixels. """
+TOP_PIPE_MIN_HEIGHT = 3
+""" The minimum height of the top pipe, in pixels. Does not include the border. """
+TOP_PIPE_MAX_HEIGHT = 22
+""" The maximum height of the top pipe, in pixels. Does not include the border. """
 
 BIRD_WIDTH = 5
 """ The width of the bird, in pixels. """
