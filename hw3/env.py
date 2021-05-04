@@ -109,8 +109,8 @@ class Frame:
         for left_x, top_height in self.pipes:
             upper_bottom_y = BORDER_HEIGHT + top_height
             lower_top_y = upper_bottom_y + PIPE_VERTICAL_GAP
-            frame[0:upper_bottom_y, max(left_x, 0):min(FRAME_WIDTH - 1, left_x + PIPE_WIDTH)] = PIPE_VALUE
-            frame[lower_top_y:, max(left_x, 0):min(FRAME_WIDTH - 1, left_x + PIPE_WIDTH)] = PIPE_VALUE
+            frame[0:upper_bottom_y, max(left_x, 0):min(FRAME_WIDTH, left_x + PIPE_WIDTH)] = PIPE_VALUE
+            frame[lower_top_y:, max(left_x, 0):min(FRAME_WIDTH, left_x + PIPE_WIDTH)] = PIPE_VALUE
         
         frame[self.bird_height:(self.bird_height + BIRD_HEIGHT), BIRD_LEFT_X:(BIRD_LEFT_X + BIRD_WIDTH)] = BIRD_VALUE
         
