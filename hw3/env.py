@@ -49,6 +49,8 @@ class Frame:
         :param get_pipe_height: A function which randomly generates the height of the next pipe. Only called when a new
                                 pipe is created.
         """
+        velocity = BIRD_TAP_VELOCITY if tap else (self.bird_velocity + BIRD_ACCELERATION)
+
         new_pipes = []
         
         for left_x, top_height in self.pipes:
@@ -59,9 +61,7 @@ class Frame:
             
             new_pipes.append((left_x - 1, top_height))
         
-        velocity = BIRD_TAP_VELOCITY if tap else (self.bird_velocity + BIRD_ACCELERATION)
-        
-        return Frame(pipes=new_pipes, bird_height=(self.bird_height + self.bird_velocity), bird_velocity=velocity)
+        return Frame(pipes=new_pipes, bird_height=(self.bird_height + velocity), bird_velocity=velocity)
     
     @property
     def done(self):
