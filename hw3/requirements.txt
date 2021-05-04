@@ -1,3 +1,6 @@
 termcolor
 pandas
 tensorflow
+matplotlib
+numpy
+notebook

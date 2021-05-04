@@ -9,8 +9,6 @@ import numpy as np
 
 from config import *
 
-# NOTE: for all coordinate systems, the origin is the upper left
-
 @dataclass
 class Frame:
     """
@@ -49,19 +47,19 @@ class Frame:
         :param get_pipe_height: A function which randomly generates the height of the next pipe. Only called when a new
                                 pipe is created.
         """
-        velocity = BIRD_TAP_VELOCITY if tap else (self.bird_velocity + BIRD_ACCELERATION)
+        new_velocity = BIRD_TAP_VELOCITY if tap else (self.bird_velocity + BIRD_ACCELERATION)
 
         new_pipes = []
         
         for left_x, top_height in self.pipes:
             # Wrap pipes around
             if left_x <= -PIPE_WIDTH:
-                left_x = FRAME_WIDTH + 1 # +1 so we have a frame with it offscreen
+                left_x = FRAME_WIDTH + 1  # +1 so we have a frame with it offscreen
                 top_height = get_pipe_height()  # re-randomize the height
             
             new_pipes.append((left_x - 1, top_height))
         
-        return Frame(pipes=new_pipes, bird_height=(self.bird_height + velocity), bird_velocity=velocity)
+        return Frame(pipes=new_pipes, bird_height=(self.bird_height + new_velocity), bird_velocity=new_velocity)
     
     @property
     def done(self):
@@ -119,7 +117,7 @@ class Frame:
     
 class FlappyEnv(object):
     """
-    A Flappy Bird environment.
+    A Flappy Bird environment. Manages Frames.
     """
     
     def __init__(self, use_pipes=False, deterministic=False):
@@ -130,8 +128,9 @@ class FlappyEnv(object):
                               Has no effect if use_pipes is False.
         """
         self.use_pipes = use_pipes
+        # providing a maxlen to the deque will automatically eject old frames as new ones are addded
         self.frames = deque(maxlen=FRAMES_PER_OBSERVATION)
-        self.generate_pipe_height = lambda: DEFAULT_PIPE_HEIGHT if deterministic else  randrange(TOP_PIPE_MIN_HEIGHT, TOP_PIPE_MAX_HEIGHT)
+        self.generate_pipe_height = lambda: DEFAULT_PIPE_HEIGHT if deterministic else randrange(TOP_PIPE_MIN_HEIGHT, TOP_PIPE_MAX_HEIGHT)
         
         self.reset()
         
@@ -153,7 +152,7 @@ class FlappyEnv(object):
             ]
             
         frame = Frame(pipes, floor(FRAME_HEIGHT / 2), 0)
-        
+
         while len(self.frames) < FRAMES_PER_OBSERVATION:
             self.frames.append(frame)
         
@@ -172,7 +171,7 @@ class FlappyEnv(object):
 
     def step(self, action):
         """
-        Advance the game by one timestep/frame, returning a new observation.
+        Advance the game by one time step/frame, returning a new observation.
         
         :param action: an integer in {0, 1} representing the action of the player, where 1 is a tap and 0 is nothing
         :return: a tuple with (in order), an observation, the neural net's reward, and if the game is over
