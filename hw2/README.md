@@ -16,13 +16,13 @@ Most of the contents of this document can also be found in the original report t
 
 For this assignment, I built an implementation of the game Nannon and several different algorithms that could play it--the most interesting of which is the knowledge-based player, which attempts to use handcrafted heuristics to pick the best move. I'll discuss the highlights here, and more details can be found in [the report](report.pdf) or in the thoroughly-documented code.
 
-### Board Representation
+## Board Representation
 
 I'm a big believer that if you choose your data structures right, the rest of your program writes itself. (That's a rough quote from someone, but I can't remember who.) To that end, I spent a substantial amount of time during this project iterating on my data structures. Originally, I stored the board as a list, where each item in the list represented a position on the board. Legal values were `0` (spot is empty), `1` (current player's checker), and `-1` (opponent's checker). Checkers in the home and goal zones were stored separately. That data structure was simple, which was nice. However, it was easy to get into an illegal state (wrong number of checkers), which I didn't like--a good data structure is one that can't represent an illegal state, after all. It was also hard to manipulate, with lots of loops looking for checkers. I ultimately decided to switch to a representation with an (unordered) list of `Checker`s, each of which has a `Player` (black or white) and a `Position`. Initially, I attempted to have each checker's position be relative _to that checker's home_, which meant that the representation was entirely perspective-independent. That ended up being too complicated to manage, so I settled on a perspective-dependent representation where all checker positions are measured relative to one player's (the perspective player's) home. I'm still not satisfied with this representation--it simultaneously feels a little too complicated, while also needing too much perspective swapping--but it's good enough. As they say, premature optimization is the root of all evil.
 
 The list of checkers (which is always `2 * checkers_per_player` long) is encapsulated by a `Board`, which also tracks the perspective (if the perspective is Black, then lower indexes are closer to Black's home and vis versa) and `GameConfiguration` (the variant of Nannon, such as `{6,3,6}` or `{8,4,6}`). `Board` contains much of the game logic, including calculating open spots, legal `Move`s, and the winner. The `Move` class tracks a possible move, and is responsible for properly executing it and returning the resulting `Board`. Finally, the `Dicestream` class wraps various iterators that can provide a stream of dice rolls.
 
-### Knowledge-Based Player
+## Knowledge-Based Player
 
 My knowledge-based Nannon player ended up somewhat similar to the score-based player that was prescribed by the assignment (which performs a minimax search, picking the move where the current player's pieces are as far along as possible and the opponent's pieces are as close to their home as possible). However, there are some key differences. It's built by assigning "points" to different aspects of each possible move. It then picks the move with the highest total point value.
 
@@ -39,7 +39,7 @@ There were a couple of things that I expected to result in significant improveme
 -   Valuing checkers closer to the goal non-linearly (ie. a checker right next to the goal is _way_ more valuable than one right next to home)
 -   Optimizing for the number of legal moves
 
-### Performance
+## Performance
 
 I spent a substantial amount of time optimizing the performance of this solution. Running a profiler against a tournament led me to introduce significant memoization (using Python's excellent [`functools.cache`/`functools.cached_property`][caching]) throughout the system, and to optimize the equality checking and hashing of various classes. This ultimately resulted in a 2-3x performance increase over the initial version.
 
