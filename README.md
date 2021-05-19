@@ -14,4 +14,12 @@ Homework 1 involved building an algorithm to solve puzzles in the following form
 
 ![Example solved 6th-order puzzle (ie. 7 hexagons)](hw1/example.png)
 
-Documentation of my approach, along with the report ([Jupyter Notebook](hw1/report.ipynb), [PDF](hw1/report.pdf)) I turned in, can be found in the [`hw1/` folder](hw1/) ., as can [thoroughly-documented source code](hw1/main.py).
+Documentation of my approach, along with the report ([Jupyter Notebook](hw1/report.ipynb), [PDF](hw1/report.pdf)) I thatturned in, can be found in the [`hw1/` folder](hw1/), as can [thoroughly-documented source code](hw1/main.py).
+
+## [Homework 2: _Nannon_](hw2/)
+
+Homework 2 involved building several algorithms to play Nannon, a simplified version of backgammon:
+
+![Nannon Rules](hw2/nannon-rules.png)
+
+Documentation of my approach, along with the report ([Jupyter Notebook](hw2/src/report.ipynb), [PDF](hw2/report.pdf)) that I turned in, can be found in the [`hw2/` folder](hw2/), as can [thoroughly-documented source code](hw2/src).
