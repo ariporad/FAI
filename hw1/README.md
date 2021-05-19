@@ -4,7 +4,7 @@
 
 # Introduction
 
-I originally wrote this project Brandeis University's Brandeis University: COSI 101A _Fundamentals of Artificial Intelligence_ in Spring 2021 (referred to by me and me alone as the Olin-eqsue _FAI_, pronounced _/faye/_).
+I originally wrote this project for Brandeis University's COSI 101A _Fundamentals of Artificial Intelligence_ in Spring 2021 (referred to by me and me alone as the Olin-eqsue _FAI_, pronounced _/faye/_).
 
 The assignment revolved around building an algorithm to solve puzzles in the following form (from [the assignment](assignment.pdf)):
 
@@ -12,7 +12,7 @@ The assignment revolved around building an algorithm to solve puzzles in the fol
 
 ![Example solved 6th-order puzzle (ie. 7 hexagons)](example.png)
 
-Most of the contents of this document can also be found in the original report that I turned in, which also includes some example program output ([Jupyter Notebook](report.ipynb), [PDF](report.pdf)). Additionally, the thoroughly-documented source code can be found in this repo (mostly in [main.py](main.py), with a few not-that-interesting helpers in [helpers.py](helpers.py)). Some discussion of my approach follow.
+Most of the contents of this document can also be found in the original report that I turned in, which also includes some example program output ([Jupyter Notebook](report.ipynb), [PDF](report.pdf)). Additionally, the thoroughly-documented source code can be found in this repo (mostly in [main.py](main.py), with a few not-that-interesting helpers in [helpers.py](helpers.py)). Some discussion of my approach follows.
 
 ## Overview
 
