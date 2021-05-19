@@ -49,6 +49,8 @@ def dqn(start_episode, model, model_target, log, config):
             #    This will not take much coding work
             # 2. Use your environment's `step` method and the action produced by epsilon-greedy
             #    to generate the next state, reward, and done values
+
+            ################################### BEGIN ARI'S CODE ###################################
             
             if random() < epsilon:  # random returns a value [0, 1)
                 action = randrange(0, len(q_values))  # pick an option at random
@@ -56,6 +58,8 @@ def dqn(start_episode, model, model_target, log, config):
                 action = q_values.index(max(q_values))  # pick the largest Q-value
 
             next_state, reward, done = env.step(action)
+
+            #################################### END ARI'S CODE ####################################
 
             if action is None:
                 raise Exception('You must implement the epsilon-greedy strategy')

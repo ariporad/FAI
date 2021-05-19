@@ -23,3 +23,11 @@ Homework 2 involved building several algorithms to play Nannon, a simplified ver
 ![Nannon Rules](hw2/nannon-rules.png)
 
 Documentation of my approach, along with the report ([Jupyter Notebook](hw2/src/report.ipynb), [PDF](hw2/report.pdf)) that I turned in, can be found in the [`hw2/` folder](hw2/), as can [thoroughly-documented source code](hw2/src).
+
+## [Homework 3: Deep Flappy Bird](hw3/)
+
+Homework 3 involved building a simulation of the game Flappy Bird and training a deep neural network to play it.
+
+![Flappy Bird](hw3/flappy-bird.jpg)
+
+Documentation of my approach, along with the report ([Jupyter Notebook](hw3/report.ipynb), [PDF](hw3/report.pdf)) that I turned in, can be found in the [`hw3/` folder](hw3/), as can [thoroughly-documented source code](hw3/env.py).
