@@ -4,7 +4,7 @@
 
 # Introduction
 
-I originally wrote this project for Brandeis University's COSI 101A _Fundamentals of Artificial Intelligence_ in Spring 2021 (referred to by me and me alone as the Olin-eqsue _FAI_, pronounced _/faye/_).
+I originally wrote this project for Brandeis University's COSI 101A _Fundamentals of Artificial Intelligence_, which I took in Spring 2021 with Professor Jordan Pollack (referred to by me and me alone as the Olin-eqsue _FAI_, pronounced _/faye/_).
 
 The assignment revolved around building an algorithm to solve puzzles in the following form (from [the assignment](assignment.pdf)):
 

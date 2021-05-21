@@ -2,9 +2,9 @@
 
 #### Brandeis University's COSI 101A
 
-This repository contains my code from Brandeis University's Brandeis University: COSI 101A _Fundamentals of Artificial Intelligence_, which I took in Spring 2021 (referred to by me and me alone as the Olin-eqsue _FAI_, pronounced _/faye/_).
+This repository contains my code from Brandeis University's COSI 101A _Fundamentals of Artificial Intelligence_, which I took in Spring 2021 with Professor Jordan Pollack (referred to by me and me alone as the Olin-eqsue _FAI_, pronounced _/faye/_).
 
-_**NOTE:** Academic dishonesty includes--among other things--submitting someone else's code as your own. Academic honesty is extremely important to me, and I expressly prohibit the use of any code in this repository in an academically dishonest way, for COSI 101A or any other course._
+_**NOTE:** Academic dishonesty includes—among other things—submitting someone else's code as your own. Academic honesty is extremely important to me, and I expressly prohibit the use of any code in this repository in an academically dishonest way, for COSI 101A or any other course._
 
 ## [Homework 1: _Drive Ya' Nuts_](hw1/)
 

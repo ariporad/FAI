@@ -4,7 +4,7 @@
 
 # Introduction
 
-I originally wrote this project for Brandeis University's COSI 101A _Fundamentals of Artificial Intelligence_ in Spring 2021 (referred to by me and me alone as the Olin-eqsue _FAI_, pronounced _/faye/_).
+I originally wrote this project for Brandeis University's COSI 101A _Fundamentals of Artificial Intelligence_, which I took in Spring 2021 with Professor Jordan Pollack (referred to by me and me alone as the Olin-eqsue _FAI_, pronounced _/faye/_).
 
 The assignment revolved around building an algorithm to play the game [Nannon](https://nannon.com), a simplified version of Backgammon. More generally, Nannon is parameterized into a family of games by three parameters: board size, number of checkers per player, and dice size. Standard Nannon is Nannon{6,3,6}.
 
