@@ -18,9 +18,9 @@ Documentation of my approach, along with the report ([Jupyter Notebook](hw1/repo
 
 ## [Homework 2: _Nannon_](hw2/)
 
-Homework 2 involved building several algorithms to play Nannon, a simplified version of backgammon:
+Homework 2 involved building several algorithms to play [Nannon](https://nannon.com), a simplified version of backgammon:
 
-![Nannon Rules](hw2/nannon-rules.png)
+![Nannon Rules](hw2/nannon-rules.jpg)
 
 Documentation of my approach, along with the report ([Jupyter Notebook](hw2/src/report.ipynb), [PDF](hw2/report.pdf)) that I turned in, can be found in the [`hw2/` folder](hw2/), as can [thoroughly-documented source code](hw2/src).
 

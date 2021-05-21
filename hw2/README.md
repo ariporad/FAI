@@ -6,9 +6,9 @@
 
 I originally wrote this project for Brandeis University's COSI 101A _Fundamentals of Artificial Intelligence_ in Spring 2021 (referred to by me and me alone as the Olin-eqsue _FAI_, pronounced _/faye/_).
 
-The assignment revolved around building an algorithm to play the game [Nannon](https://nannon.net), a simplified version of Backgammon. More generally, Nannon is parameterized into a family of games by three parameters: board size, number of checkers per player, and dice size. Standard Nannon is Nannon{6,3,6}.
+The assignment revolved around building an algorithm to play the game [Nannon](https://nannon.com), a simplified version of Backgammon. More generally, Nannon is parameterized into a family of games by three parameters: board size, number of checkers per player, and dice size. Standard Nannon is Nannon{6,3,6}.
 
-![Nannon Rules](nannon-rules.png)
+![Nannon Rules](nannon-rules.jpg)
 
 Most of the contents of this document can also be found in the original report that I turned in, which also includes some example program output ([Jupyter Notebook](src/report.ipynb), [PDF](report.pdf)). Additionally, the thoroughly-documented source code can be found in this repo (the most interesting bits can be found in [Board.py](src/Board.py) and [players.py](src/players.py)). Some discussion of my approach follows.
 
